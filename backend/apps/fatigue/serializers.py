@@ -1,7 +1,6 @@
 from rest_framework import serializers
 from .models import IndividualFatigueAnalysis
 
-
 class IndividualFatigueAnalysisSerializer(serializers.ModelSerializer):
     student_name = serializers.CharField(source='student.name', read_only=True)
     student_matricula = serializers.CharField(source='student.matricula', read_only=True)
