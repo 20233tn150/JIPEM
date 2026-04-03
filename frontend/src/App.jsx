@@ -16,6 +16,9 @@ import ClassroomSessions from './pages/attendance/ClassroomSessions'
 import FatigueList from './pages/fatigue/FatigueList'
 import NewFatigueAnalysis from './pages/fatigue/NewFatigueAnalysis'
 import FatigueAnalysisDetail from './pages/fatigue/FatigueAnalysisDetail'
+import HowItWorks from './pages/HowItWorks'
+import TermsAndConditions from './pages/TermsAndConditions'
+import TechDocs from './pages/TechDocs'
 import Layout from './components/Layout'
 
 function PrivateRoute({ children }) {
@@ -54,6 +57,9 @@ export default function App() {
             <Route path="fatigue" element={<FatigueList />} />
             <Route path="fatigue/new" element={<NewFatigueAnalysis />} />
             <Route path="fatigue/individual/:id" element={<FatigueAnalysisDetail />} />
+            <Route path="how-it-works" element={<HowItWorks />} />
+            <Route path="terms" element={<TermsAndConditions />} />
+            <Route path="tech-docs" element={<TechDocs />} />
           </Route>
           <Route path="*" element={<Navigate to="/classrooms" replace />} />
         </Routes>

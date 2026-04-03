@@ -16,7 +16,7 @@ export default function Login() {
     setLoading(true)
     try {
       await login(form.username, form.password)
-      navigate('/dashboard')
+      navigate('/classrooms')
     } catch (err) {
       setError(err.response?.data?.detail || 'Credenciales incorrectas.')
     } finally {

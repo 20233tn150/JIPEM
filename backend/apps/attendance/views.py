@@ -64,14 +64,23 @@ class UploadVideoView(APIView):
     def post(self, request, session_id):
         session = self._get_session(request, session_id)
 
-        if session.status in (
-            AttendanceSession.STATUS_PROCESSING,
-            AttendanceSession.STATUS_COMPLETED,
-        ):
+        if session.status == AttendanceSession.STATUS_PROCESSING:
             return Response(
-                {'error': f'La sesion ya esta en estado: {session.status}'},
+                {'error': 'La sesión está siendo procesada. Espera a que termine.'},
                 status=400,
             )
+        if session.status == AttendanceSession.STATUS_COMPLETED:
+            return Response(
+                {'error': 'La sesión ya fue completada. Usa las correcciones manuales si necesitas cambios.'},
+                status=400,
+            )
+
+        # Si hubo un error previo, limpiar para reintentar
+        if session.status == AttendanceSession.STATUS_ERROR:
+            AttendanceRecord.objects.filter(session=session).delete()
+            session.status = AttendanceSession.STATUS_PENDING
+            session.error_message = ''
+            session.save(update_fields=['status', 'error_message'])
 
         video_file = request.FILES.get('video')
         if not video_file:
@@ -128,6 +137,31 @@ class SessionStatusView(APIView):
             'status': session.status,
             'error_message': session.error_message,
         })
+
+
+class SessionDeleteView(APIView):
+    """Elimina una sesión en estado pending o error."""
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, session_id):
+        qs = AttendanceSession.objects.all()
+        if not request.user.is_admin:
+            qs = qs.filter(maestro=request.user)
+        session = get_object_or_404(qs, pk=session_id)
+
+        if session.status == AttendanceSession.STATUS_PROCESSING:
+            return Response(
+                {'error': 'No se puede eliminar una sesión en procesamiento.'},
+                status=400,
+            )
+        if session.status == AttendanceSession.STATUS_COMPLETED:
+            return Response(
+                {'error': 'No se puede eliminar una sesión completada.'},
+                status=400,
+            )
+
+        session.delete()
+        return Response(status=204)
 
 
 class AttendanceRecordToggleView(APIView):

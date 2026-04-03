@@ -1,20 +1,27 @@
-import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
-import { ChevronLeft, CheckCircle, XCircle, ClipboardList, ExternalLink, RefreshCw } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { useParams, Link, useNavigate } from 'react-router-dom'
+import { ChevronLeft, CheckCircle, XCircle, ClipboardList, ExternalLink, RefreshCw, Upload, Trash2, AlertTriangle } from 'lucide-react'
 import api from '../../api/axios'
 import PageHeader from '../../components/PageHeader'
 import StatusBadge from '../../components/StatusBadge'
 
 export default function SessionDetail() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const [session, setSession] = useState(null)
   const [records, setRecords] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [toggling, setToggling] = useState(null)
+  const [retryFile, setRetryFile] = useState(null)
+  const [retryLoading, setRetryLoading] = useState(false)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [retryError, setRetryError] = useState('')
+  const pollingRef = useRef(null)
 
   useEffect(() => {
     fetchData()
+    return () => clearInterval(pollingRef.current)
   }, [id])
 
   const fetchData = async () => {
@@ -24,11 +31,29 @@ export default function SessionDetail() {
       const res = await api.get(`/attendance/sessions/${id}/`)
       setSession(res.data)
       setRecords(res.data.records || [])
+      if (res.data.status === 'processing') {
+        startPolling()
+      }
     } catch (err) {
       setError(err.response?.data?.detail || 'Error al cargar la sesión.')
     } finally {
       setLoading(false)
     }
+  }
+
+  const startPolling = () => {
+    clearInterval(pollingRef.current)
+    pollingRef.current = setInterval(async () => {
+      try {
+        const res = await api.get(`/attendance/sessions/${id}/status/`)
+        if (res.data.status !== 'processing') {
+          clearInterval(pollingRef.current)
+          fetchData()
+        }
+      } catch {
+        clearInterval(pollingRef.current)
+      }
+    }, 3000)
   }
 
   const openReport = async () => {
@@ -52,6 +77,41 @@ export default function SessionDetail() {
       // silently fail — UI stays unchanged
     } finally {
       setToggling(null)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!window.confirm('¿Eliminar esta sesión? Esta acción no se puede deshacer.')) return
+    setDeleteLoading(true)
+    try {
+      await api.delete(`/attendance/sessions/${id}/delete/`)
+      navigate('/attendance')
+    } catch (err) {
+      setRetryError(err.response?.data?.error || 'Error al eliminar la sesión.')
+      setDeleteLoading(false)
+    }
+  }
+
+  const handleRetry = async () => {
+    if (!retryFile) {
+      setRetryError('Selecciona un archivo de video.')
+      return
+    }
+    setRetryLoading(true)
+    setRetryError('')
+    try {
+      const formData = new FormData()
+      formData.append('video', retryFile)
+      await api.post(`/attendance/sessions/${id}/upload-video/`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      setRetryFile(null)
+      setSession(prev => ({ ...prev, status: 'processing' }))
+      startPolling()
+    } catch (err) {
+      setRetryError(err.response?.data?.error || 'Error al subir el video.')
+    } finally {
+      setRetryLoading(false)
     }
   }
 
@@ -82,6 +142,10 @@ export default function SessionDetail() {
   const totalCount = records.length
   const attendancePct = totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : 0
   const isCompleted = session?.status === 'completed'
+  const isError = session?.status === 'error'
+  const isPending = session?.status === 'pending'
+  const isProcessing = session?.status === 'processing'
+  const canDelete = isError || isPending
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -103,16 +167,74 @@ export default function SessionDetail() {
         title={`Sesión del ${session?.date}`}
         subtitle={session?.classroom_name || `Grupo ${session?.classroom}`}
         action={
-          isCompleted && (
-            <button
-              onClick={openReport}
-              className="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm"
-            >
-              <ExternalLink size={15} /> Ver Reporte
-            </button>
-          )
+          <div className="flex items-center gap-2">
+            {canDelete && (
+              <button
+                onClick={handleDelete}
+                disabled={deleteLoading}
+                className="bg-red-100 hover:bg-red-200 text-red-700 font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm disabled:opacity-50"
+              >
+                {deleteLoading ? <RefreshCw size={15} className="animate-spin" /> : <Trash2 size={15} />}
+                Eliminar sesión
+              </button>
+            )}
+            {isCompleted && (
+              <button
+                onClick={openReport}
+                className="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm"
+              >
+                <ExternalLink size={15} /> Ver Reporte
+              </button>
+            )}
+          </div>
         }
       />
+
+      {/* Processing banner */}
+      {isProcessing && (
+        <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-xl mb-6 flex items-center gap-3 text-sm">
+          <RefreshCw size={16} className="animate-spin flex-shrink-0" />
+          <span>Procesando video de asistencia... Los resultados aparecerán automáticamente.</span>
+        </div>
+      )}
+
+      {/* Error recovery panel */}
+      {isError && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-5 mb-6">
+          <div className="flex items-start gap-3 mb-4">
+            <AlertTriangle size={18} className="text-red-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-red-800">Error en el procesamiento</p>
+              <p className="text-sm text-red-600 mt-0.5">{session.error_message || 'Ocurrió un error al procesar el video.'}</p>
+            </div>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <label className="flex-1 cursor-pointer">
+              <input
+                type="file"
+                accept=".mp4,.avi,.mov,.mkv"
+                className="hidden"
+                onChange={e => { setRetryFile(e.target.files[0]); setRetryError('') }}
+              />
+              <div className="flex items-center gap-2 border border-dashed border-red-300 rounded-lg px-4 py-2.5 text-sm text-red-600 hover:bg-red-100 transition-colors">
+                <Upload size={15} />
+                {retryFile ? retryFile.name : 'Seleccionar nuevo video'}
+              </div>
+            </label>
+            <button
+              onClick={handleRetry}
+              disabled={retryLoading || !retryFile}
+              className="bg-red-600 hover:bg-red-700 text-white font-semibold px-5 py-2.5 rounded-lg transition-colors flex items-center gap-2 text-sm disabled:opacity-50"
+            >
+              {retryLoading ? <RefreshCw size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+              Reintentar
+            </button>
+          </div>
+          {retryError && (
+            <p className="text-xs text-red-600 mt-2">{retryError}</p>
+          )}
+        </div>
+      )}
 
       {/* Session Info */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
@@ -172,7 +294,7 @@ export default function SessionDetail() {
           <div className="p-10 text-center">
             <ClipboardList size={36} className="mx-auto mb-3 text-gray-300" />
             <p className="font-medium text-gray-500">Sin registros de asistencia</p>
-            {session?.status === 'pending' && (
+            {isPending && (
               <p className="text-sm mt-2 text-gray-400">Sube un video para procesar la asistencia automáticamente</p>
             )}
           </div>

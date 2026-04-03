@@ -39,7 +39,7 @@ export default function Register() {
         password: form.password,
         password2: form.confirmPassword,
       })
-      navigate('/dashboard')
+      navigate('/classrooms')
     } catch (err) {
       const data = err.response?.data
       if (data) {

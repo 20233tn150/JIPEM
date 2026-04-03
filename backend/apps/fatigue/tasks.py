@@ -1,3 +1,26 @@
+"""
+Fatigue analysis — individual student video.
+
+Metric: PERCLOS (Percentage of Eye Closure)
+  Gold-standard indicator for drowsiness used in automotive safety research.
+
+Pipeline:
+  1. Load student face encodings and train LBPH recognizer.
+  2. Read video frame by frame (1 of every FRAMES_TO_SKIP).
+  3. Detect and identify the student's face using Haarcascade + LBPH.
+  4. For each detected face analyze the upper 60% (eye zone):
+       - If haarcascade_eye detects open eyes → eye_detected_frames++
+       - If no eyes detected for EYE_CLOSED_CONSEC_FRAMES consecutive frames
+         → accumulate eyes_closed_secs and count closure_episodes
+  5. Compute PERCLOS = 1 - (eye_detected_frames / face_frames)
+  6. Scoring:
+       fatigue_score = min(100, perclos * 200 + closure_episodes * 5)
+       attention_score = 100 - fatigue_score
+  7. Classify: atento (≥70), distraido (40–69), fatigado (<40).
+  8. Store closure_episodes in yawn_count field (repurposed).
+  9. Delete video.
+"""
+
 import io
 import os
 import logging
@@ -8,14 +31,16 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-FRAMES_TO_SKIP = 5             
-FACE_SIZE = (128, 128)          
-LBPH_CONFIDENCE_THRESHOLD = 100 
-PRESENCE_THRESHOLD_PCT = 0.10   
+# ── Processing constants ────────────────────────────────────────────────────
+FRAMES_TO_SKIP = 5
+FACE_SIZE = (128, 128)
+LBPH_CONFIDENCE_THRESHOLD = 100
+PRESENCE_THRESHOLD_PCT = 0.10
 
-EYE_CLOSED_CONSEC_SECS = 0.4   
-YAWN_CONSEC_SECS = 0.3           
+# Seconds of consecutive no-eye-detection to count as a closure episode
+EYE_CLOSED_CONSEC_SECS = 0.5
 
+# ── Cascades (loaded once at import) ───────────────────────────────────────
 _CASCADE_PATH = cv2.data.haarcascades
 _FACE_CASCADE = cv2.CascadeClassifier(
     os.path.join(_CASCADE_PATH, 'haarcascade_frontalface_default.xml')
@@ -23,13 +48,9 @@ _FACE_CASCADE = cv2.CascadeClassifier(
 _EYE_CASCADE = cv2.CascadeClassifier(
     os.path.join(_CASCADE_PATH, 'haarcascade_eye.xml')
 )
-_SMILE_CASCADE = cv2.CascadeClassifier(
-    os.path.join(_CASCADE_PATH, 'haarcascade_smile.xml')
-)
 
 
 def _classify(attention_score: float) -> str:
-
     if attention_score >= 70:
         return 'atento'
     elif attention_score >= 40:
@@ -38,7 +59,7 @@ def _classify(attention_score: float) -> str:
 
 
 def _build_student_recognizer(encodings):
-
+    """Train LBPH recognizer from numpy-saved face samples. Returns recognizer or None."""
     if not encodings:
         return None
     face_images = [np.load(io.BytesIO(bytes(fe.encoding_data))) for fe in encodings]
@@ -48,12 +69,11 @@ def _build_student_recognizer(encodings):
 
 
 def _select_best_face(faces, gray_eq, recognizer):
-    
+    """Return the face most likely to belong to the student (lowest LBPH confidence)."""
     if recognizer is None:
         return max(faces, key=lambda f: f[2] * f[3])
 
-    best_face = None
-    best_conf = float('inf')
+    best_face, best_conf = None, float('inf')
     for (x, y, w, h) in faces:
         pad = int(0.1 * min(w, h))
         x1, y1 = max(0, x - pad), max(0, y - pad)
@@ -61,9 +81,8 @@ def _select_best_face(faces, gray_eq, recognizer):
         face_crop = gray_eq[y1:y2, x1:x2]
         if face_crop.size == 0:
             continue
-        face_resized = cv2.resize(face_crop, FACE_SIZE)
         try:
-            _, confidence = recognizer.predict(face_resized)
+            _, confidence = recognizer.predict(cv2.resize(face_crop, FACE_SIZE))
             if confidence < LBPH_CONFIDENCE_THRESHOLD and confidence < best_conf:
                 best_conf = confidence
                 best_face = (x, y, w, h)
@@ -72,62 +91,48 @@ def _select_best_face(faces, gray_eq, recognizer):
     return best_face
 
 
-def _reset_consecutive_counters(state):
-    
-    state['no_eye_counter'] = 0
-    state['yawn_counter'] = 0
-    state['yawn_in_progress'] = False
-
-
 def _analyze_eyes(face_crop, state, eye_closed_frames, fps):
-    
-    top_face = face_crop[:int(face_crop.shape[0] * 0.6), :]
-    if top_face.size == 0:
+    """
+    Detect open eyes in the upper 60% of the face.
+
+    Updates:
+      - eye_detected_frames: count of frames where eyes were found
+      - no_eye_counter: consecutive frames without eyes
+      - eyes_closed_secs: accumulated seconds with eyes closed
+      - closure_episodes: count of distinct sustained-closure events
+    """
+    top = face_crop[:int(face_crop.shape[0] * 0.6), :]
+    if top.size == 0:
         return
-    top_resized = cv2.resize(top_face, (0, 0), fx=2.0, fy=2.0)
+    top_resized = cv2.resize(top, (0, 0), fx=2.0, fy=2.0)
     eyes = _EYE_CASCADE.detectMultiScale(
         top_resized, scaleFactor=1.1, minNeighbors=3, minSize=(15, 15)
     )
+
     if len(eyes) == 0:
         state['no_eye_counter'] += 1
         if state['no_eye_counter'] >= eye_closed_frames:
             state['eyes_closed_secs'] += FRAMES_TO_SKIP / fps
+            # Count each distinct episode only when the threshold is first crossed
+            if state['no_eye_counter'] == eye_closed_frames:
+                state['closure_episodes'] += 1
     else:
         state['eye_detected_frames'] += 1
         state['no_eye_counter'] = 0
 
 
-def _analyze_yawn(face_crop, state, yawn_frames_threshold):
-    
-    bottom_face = face_crop[int(face_crop.shape[0] * 0.5):, :]
-    if bottom_face.size == 0:
-        return
-    bottom_resized = cv2.resize(bottom_face, (0, 0), fx=2.0, fy=2.0)
-    smiles = _SMILE_CASCADE.detectMultiScale(
-        bottom_resized, scaleFactor=1.3, minNeighbors=10, minSize=(20, 20)
-    )
-    if len(smiles) > 0:
-        state['yawn_counter'] += 1
-        if state['yawn_counter'] >= yawn_frames_threshold and not state['yawn_in_progress']:
-            state['yawn_count'] += 1
-            state['yawn_in_progress'] = True
-    else:
-        state['yawn_counter'] = 0
-        state['yawn_in_progress'] = False
-
-
-def _process_single_frame(gray_eq, state, recognizer, use_recognition, eye_closed_frames, yawn_frames_threshold, fps):
-    
+def _process_single_frame(gray_eq, state, recognizer, use_recognition, eye_closed_frames, fps):
+    """Detect the student's face and run eye analysis."""
     faces = _FACE_CASCADE.detectMultiScale(
         gray_eq, scaleFactor=1.1, minNeighbors=4, minSize=(40, 40)
     )
     if len(faces) == 0:
-        _reset_consecutive_counters(state)
+        state['no_eye_counter'] = 0
         return
 
     best_face = _select_best_face(faces, gray_eq, recognizer if use_recognition else None)
     if best_face is None:
-        _reset_consecutive_counters(state)
+        state['no_eye_counter'] = 0
         return
 
     (x, y, w, h) = best_face
@@ -140,14 +145,11 @@ def _process_single_frame(gray_eq, state, recognizer, use_recognition, eye_close
 
     state['face_frames'] += 1
     _analyze_eyes(face_crop, state, eye_closed_frames, fps)
-    _analyze_yawn(face_crop, state, yawn_frames_threshold)
 
 
-def _run_video_loop(cap, fps, recognizer, use_recognition, state, eye_closed_frames, yawn_frames_threshold):
-   
+def _run_video_loop(cap, fps, recognizer, use_recognition, state, eye_closed_frames):
     total_frames = 0
     processed_frames = 0
-
     while True:
         ret, frame = cap.read()
         if not ret:
@@ -159,35 +161,48 @@ def _run_video_loop(cap, fps, recognizer, use_recognition, state, eye_closed_fra
         small = cv2.resize(frame, (0, 0), fx=0.5, fy=0.5)
         gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
         gray_eq = cv2.equalizeHist(gray)
-        _process_single_frame(
-            gray_eq, state, recognizer, use_recognition,
-            eye_closed_frames, yawn_frames_threshold, fps,
-        )
-
+        _process_single_frame(gray_eq, state, recognizer, use_recognition, eye_closed_frames, fps)
     return processed_frames
 
 
-def _compute_fatigue_scores(state, face_frames, fps):
-    
-    effective = max(face_frames * FRAMES_TO_SKIP / fps, 1.0)
-    eye_closed_ratio = state['eyes_closed_secs'] / effective
-    eye_undetected_ratio = 1.0 - (state['eye_detected_frames'] / max(face_frames, 1))
-    eye_fatigue = min(1.0, eye_closed_ratio * 1.5 + eye_undetected_ratio * 0.4)
-    fatigue = min(100.0, eye_fatigue * 100 + state['yawn_count'] * 12)
+def _compute_scores(state):
+    """
+    PERCLOS-based scoring.
+
+    PERCLOS = fraction of face-visible frames where eyes were NOT detected.
+    Research thresholds (adapted for classroom context):
+      < 0.15  → alert        (attention 70-100)
+      0.15-0.35 → drowsy     (attention 40-69)
+      > 0.35  → very drowsy  (attention < 40)
+
+    Formula:
+      fatigue = min(100, perclos * 200 + closure_episodes * 5)
+      attention = 100 - fatigue
+    """
+    face_frames = state['face_frames']
+    if face_frames == 0:
+        return None
+
+    perclos = 1.0 - (state['eye_detected_frames'] / face_frames)
+    fatigue = min(100.0, perclos * 200.0 + state['closure_episodes'] * 5.0)
     attention = max(0.0, 100.0 - fatigue)
+
+    logger.info(
+        f"PERCLOS={perclos:.2f}  eye_detected={state['eye_detected_frames']}"
+        f"/{face_frames}  closure_episodes={state['closure_episodes']}"
+        f"  eyes_closed_secs={state['eyes_closed_secs']:.1f}"
+        f"  → fatigue={fatigue:.1f}  attention={attention:.1f}"
+    )
     return {
         'attention': attention,
         'fatigue': fatigue,
-        'yawn_count': state['yawn_count'],
+        'closure_episodes': state['closure_episodes'],
         'eyes_closed_secs': state['eyes_closed_secs'],
-        'eye_closed_ratio': eye_closed_ratio,
-        'eye_undetected_ratio': eye_undetected_ratio,
-        'effective': effective,
+        'perclos': perclos,
     }
 
 
 def process_individual_fatigue(analysis_id: int, video_path: str) -> None:
-    
     from apps.fatigue.models import IndividualFatigueAnalysis
     from apps.classrooms.models import FaceEncoding
 
@@ -203,55 +218,40 @@ def process_individual_fatigue(analysis_id: int, video_path: str) -> None:
         use_recognition = recognizer is not None
 
         if use_recognition:
-            logger.info(f"IndividualFatigue {analysis_id}: LBPH entrenado con {len(encodings)} imágenes.")
+            logger.info(f"Fatigue {analysis_id}: LBPH trained with {len(encodings)} samples.")
         else:
-            logger.warning(f"IndividualFatigue {analysis_id}: sin encodings — se analizará el rostro dominante.")
+            logger.warning(f"Fatigue {analysis_id}: no encodings — using dominant face.")
 
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
-            raise ValueError(f"No se puede abrir el video: {video_path}")
+            raise ValueError(f"Cannot open video: {video_path}")
 
         fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
         eye_closed_frames = max(1, int(EYE_CLOSED_CONSEC_SECS * fps / FRAMES_TO_SKIP))
-        yawn_frames_threshold = max(1, int(YAWN_CONSEC_SECS * fps / FRAMES_TO_SKIP))
 
         state = {
-            'face_frames': 0, 'eye_detected_frames': 0, 'no_eye_counter': 0,
-            'eyes_closed_secs': 0.0, 'yawn_counter': 0,
-            'yawn_in_progress': False, 'yawn_count': 0,
+            'face_frames': 0,
+            'eye_detected_frames': 0,
+            'no_eye_counter': 0,
+            'eyes_closed_secs': 0.0,
+            'closure_episodes': 0,
         }
 
-        processed_frames = _run_video_loop(
-            cap, fps, recognizer, use_recognition, state,
-            eye_closed_frames, yawn_frames_threshold,
-        )
+        processed_frames = _run_video_loop(cap, fps, recognizer, use_recognition, state, eye_closed_frames)
         cap.release()
 
         face_frames = state['face_frames']
-        logger.info(
-            f"IndividualFatigue {analysis_id}: {processed_frames} frames procesados, "
-            f"rostro detectado en {face_frames} frames."
-        )
+        logger.info(f"Fatigue {analysis_id}: {processed_frames} frames processed, face in {face_frames}.")
 
         if processed_frames > 0 and (face_frames / processed_frames) >= PRESENCE_THRESHOLD_PCT:
-            scores = _compute_fatigue_scores(state, face_frames, fps)
-            logger.info(
-                f"IndividualFatigue {analysis_id}: effective={scores['effective']:.1f}s "
-                f"eye_closed_ratio={scores['eye_closed_ratio']:.2f} "
-                f"eye_undetected_ratio={scores['eye_undetected_ratio']:.2f} "
-                f"yawns={scores['yawn_count']} "
-                f"fatigue={scores['fatigue']:.1f}% attention={scores['attention']:.1f}%"
-            )
+            scores = _compute_scores(state)
             analysis.attention_score = round(scores['attention'], 2)
             analysis.fatigue_score = round(scores['fatigue'], 2)
-            analysis.yawn_count = scores['yawn_count']
+            analysis.yawn_count = scores['closure_episodes']   # repurposed field
             analysis.eyes_closed_secs = round(scores['eyes_closed_secs'], 2)
             analysis.result_label = _classify(scores['attention'])
         else:
-            logger.warning(
-                f"IndividualFatigue {analysis_id}: rostro detectado en solo "
-                f"{face_frames}/{processed_frames} frames — por debajo del umbral."
-            )
+            logger.warning(f"Fatigue {analysis_id}: face below presence threshold.")
             analysis.result_label = ''
 
         analysis.status = IndividualFatigueAnalysis.STATUS_COMPLETED
@@ -261,7 +261,7 @@ def process_individual_fatigue(analysis_id: int, video_path: str) -> None:
         ])
 
     except Exception as exc:
-        logger.exception(f"Error procesando fatiga individual {analysis_id}: {exc}")
+        logger.exception(f"Error processing fatigue {analysis_id}: {exc}")
         if analysis:
             analysis.status = IndividualFatigueAnalysis.STATUS_ERROR
             analysis.error_message = str(exc)
@@ -270,13 +270,11 @@ def process_individual_fatigue(analysis_id: int, video_path: str) -> None:
         if os.path.exists(video_path):
             try:
                 os.remove(video_path)
-                logger.info(f"Video eliminado: {video_path}")
             except Exception as e:
-                logger.warning(f"No se pudo eliminar el video {video_path}: {e}")
+                logger.warning(f"Could not delete video {video_path}: {e}")
 
 
 def start_individual_fatigue_processing(analysis_id: int, video_path: str) -> None:
-    
     thread = threading.Thread(
         target=process_individual_fatigue,
         args=(analysis_id, video_path),
