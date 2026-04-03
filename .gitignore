@@ -1,6 +1,35 @@
+# Python
 *.pyc
+*.pyo
 __pycache__/
+*.egg-info/
+
+# Django
 db.sqlite3
+/backend/static/
+/backend/media/
+
+# Entorno
 .env
 venv/
 env/
+.venv/
+
+# Node
+node_modules/
+dist/
+.cache/
+
+# Vite
+frontend/dist/
+frontend/.cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+*.suo
+*.user

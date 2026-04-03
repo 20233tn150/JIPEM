@@ -179,19 +179,6 @@ export default function FatigueAnalysisDetail() {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border p-5">
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-4">Detalles del análisis</p>
-            <div className="grid grid-cols-2 gap-6">
-              <div className="text-center">
-                <p className="text-3xl font-bold text-gray-800">{analysis.yawn_count}</p>
-                <p className="text-xs text-gray-500 mt-1">Bostezos detectados</p>
-              </div>
-              <div className="text-center">
-                <p className="text-3xl font-bold text-gray-800">{analysis.eyes_closed_secs}s</p>
-                <p className="text-xs text-gray-500 mt-1">Ojos cerrados (acumulado)</p>
-              </div>
-            </div>
-          </div>
         </div>
       )}
 

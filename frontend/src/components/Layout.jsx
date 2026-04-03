@@ -6,6 +6,8 @@ import {
   GraduationCap,
   LogOut,
   ScanFace,
+  HelpCircle,
+  FileText,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
@@ -13,6 +15,11 @@ const navLinks = [
   { to: '/classrooms', label: 'Grupos', Icon: BookOpen },
   { to: '/attendance', label: 'Asistencia', Icon: ClipboardList },
   { to: '/fatigue', label: 'Análisis de Fatiga', Icon: BrainCircuit },
+]
+
+const infoLinks = [
+  { to: '/how-it-works', label: 'Cómo funciona', Icon: HelpCircle },
+  { to: '/terms', label: 'Términos y condiciones', Icon: FileText },
 ]
 
 export default function Layout() {
@@ -59,6 +66,28 @@ export default function Layout() {
               {label}
             </NavLink>
           ))}
+
+          <div className="mt-5 pt-4 border-t border-slate-700/60">
+            <p className="text-slate-500 text-xs uppercase tracking-wider px-3 mb-2">
+              Información
+            </p>
+            {infoLinks.map(({ to, label, Icon }) => (
+              <NavLink
+                key={to}
+                to={to}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'bg-blue-600 text-white'
+                      : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                  }`
+                }
+              >
+                <Icon size={17} />
+                {label}
+              </NavLink>
+            ))}
+          </div>
 
           {user?.role === 'admin' && (
             <div className="mt-5 pt-4 border-t border-slate-700/60">
