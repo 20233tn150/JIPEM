@@ -1,12 +1,12 @@
 import base64
 import io
-import os
+import threading
 
 import cv2
 import numpy as np
 
 from django.shortcuts import get_object_or_404
-from rest_framework import generics, status
+from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -14,40 +14,32 @@ from rest_framework.views import APIView
 from .models import Classroom, Student, FaceEncoding
 from .serializers import ClassroomSerializer, StudentSerializer, FaceStatusSerializer
 
-# Load Haarcascade once at module level
-_CASCADE_PATH = cv2.data.haarcascades
-_FACE_CASCADE = cv2.CascadeClassifier(
-    os.path.join(_CASCADE_PATH, 'haarcascade_frontalface_default.xml')
-)
-FACE_SIZE = (128, 128)
+import logging
+logger = logging.getLogger(__name__)
+
+# ── InsightFace singleton ────────────────────────────────────────────────────
+_face_app = None
+_face_app_lock = threading.Lock()
 
 
-def detect_and_crop_face(rgb_image):
-    """
-    Detect the largest face in the image and return a 128x128 grayscale crop.
-    Returns None if no face is found.
-    """
-    gray = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2GRAY)
-    faces = _FACE_CASCADE.detectMultiScale(
-        gray,
-        scaleFactor=1.1,
-        minNeighbors=5,
-        minSize=(60, 60),
-    )
-    if len(faces) == 0:
-        return None
-    # Pick the largest face
-    x, y, w, h = max(faces, key=lambda r: r[2] * r[3])
-    # Add padding
-    pad = int(0.1 * min(w, h))
-    x = max(0, x - pad)
-    y = max(0, y - pad)
-    w = min(gray.shape[1] - x, w + 2 * pad)
-    h = min(gray.shape[0] - y, h + 2 * pad)
-    face_crop = gray[y:y + h, x:x + w]
-    face_crop = cv2.resize(face_crop, FACE_SIZE)
-    return face_crop
+def _get_face_app():
+    """Lazy-initialize InsightFace FaceAnalysis (thread-safe singleton)."""
+    global _face_app
+    if _face_app is None:
+        with _face_app_lock:
+            if _face_app is None:
+                from insightface.app import FaceAnalysis
+                app = FaceAnalysis(
+                    name='buffalo_l',
+                    providers=['CPUExecutionProvider'],
+                )
+                app.prepare(ctx_id=-1, det_size=(640, 640))
+                _face_app = app
+                logger.info("InsightFace buffalo_l loaded (registration).")
+    return _face_app
 
+
+# ── Classroom CRUD ───────────────────────────────────────────────────────────
 
 class ClassroomListCreateView(generics.ListCreateAPIView):
     serializer_class = ClassroomSerializer
@@ -77,6 +69,8 @@ class ClassroomDetailView(generics.RetrieveUpdateDestroyAPIView):
         instance.is_active = False
         instance.save()
 
+
+# ── Student CRUD ─────────────────────────────────────────────────────────────
 
 class StudentListCreateView(generics.ListCreateAPIView):
     serializer_class = StudentSerializer
@@ -117,36 +111,54 @@ class StudentDetailView(generics.RetrieveUpdateDestroyAPIView):
         instance.save()
 
 
+# ── Face capture ─────────────────────────────────────────────────────────────
+
 class CaptureFaceView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, student_id):
         student = self._get_student(request, student_id)
+
         image_b64 = request.data.get('image_base64', '')
         if not image_b64:
             return Response({'error': 'Se requiere image_base64.'}, status=400)
 
-        # Decode base64 image
+        # Decode base64 → BGR numpy array
         if ',' in image_b64:
             image_b64 = image_b64.split(',')[1]
         try:
             image_data = base64.b64decode(image_b64)
             nparr = np.frombuffer(image_data, np.uint8)
             img_bgr = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-            rgb_img = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+            if img_bgr is None:
+                raise ValueError("imdecode returned None")
         except Exception:
             return Response({'error': 'Imagen invalida o corrupta.'}, status=400)
 
-        face_crop = detect_and_crop_face(rgb_img)
-        if face_crop is None:
+        # Detect faces and extract ArcFace embedding
+        face_app = _get_face_app()
+        faces = face_app.get(img_bgr)
+
+        if not faces:
             return Response({'error': 'No se detecto rostro en la imagen.'}, status=400)
 
+        # Pick the face with the highest detection confidence
+        best_face = max(faces, key=lambda f: f.det_score)
+
+        if best_face.det_score < 0.5:
+            return Response(
+                {'error': 'Rostro detectado con baja confianza. Intenta con mejor iluminacion.'},
+                status=400,
+            )
+
+        # Store 512-d L2-normalized ArcFace embedding
+        embedding = best_face.embedding.astype(np.float32)
         buf = io.BytesIO()
-        np.save(buf, face_crop)
-        encoding_bytes = buf.getvalue()
-        FaceEncoding.objects.create(student=student, encoding_data=encoding_bytes)
+        np.save(buf, embedding)
+        FaceEncoding.objects.create(student=student, encoding_data=buf.getvalue())
 
         count = student.face_encodings.count()
+        logger.info(f"Face sample saved for student {student.id} (total: {count}).")
         return Response({
             'message': 'Muestra facial guardada correctamente.',
             'sample_count': count,

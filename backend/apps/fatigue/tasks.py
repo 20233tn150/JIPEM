@@ -1,24 +1,22 @@
 """
 Fatigue analysis — individual student video.
 
-Metric: PERCLOS (Percentage of Eye Closure)
-  Gold-standard indicator for drowsiness used in automotive safety research.
+Identity pipeline: InsightFace ArcFace (same model as attendance).
+PERCLOS pipeline:  OpenCV Haarcascade eye detector on the identified face crop.
 
-Pipeline:
-  1. Load student face encodings and train LBPH recognizer.
-  2. Read video frame by frame (1 of every FRAMES_TO_SKIP).
-  3. Detect and identify the student's face using Haarcascade + LBPH.
-  4. For each detected face analyze the upper 60% (eye zone):
-       - If haarcascade_eye detects open eyes → eye_detected_frames++
-       - If no eyes detected for EYE_CLOSED_CONSEC_FRAMES consecutive frames
-         → accumulate eyes_closed_secs and count closure_episodes
-  5. Compute PERCLOS = 1 - (eye_detected_frames / face_frames)
-  6. Scoring:
-       fatigue_score = min(100, perclos * 200 + closure_episodes * 5)
+Steps:
+  1. Load student's 512-d ArcFace embeddings from DB (mean vector, L2-normalized).
+  2. Read video every FRAMES_TO_SKIP frames at 0.5x scale.
+  3. Run InsightFace on each frame to detect faces + get embeddings.
+  4. Find the face whose cosine similarity with the student reference ≥ COSINE_THRESHOLD.
+  5. Crop that face region → run Haarcascade eye detector on upper 60% of face.
+  6. Accumulate PERCLOS (Percentage of Eye Closure) statistics.
+  7. Score:
+       fatigue_score  = min(100, perclos * 200 + closure_episodes * 5)
        attention_score = 100 - fatigue_score
-  7. Classify: atento (≥70), distraido (40–69), fatigado (<40).
-  8. Store closure_episodes in yawn_count field (repurposed).
-  9. Delete video.
+  8. Classify: atento (≥70), distraido (40–69), fatigado (<40).
+  9. Store closure_episodes in yawn_count field (repurposed).
+ 10. Delete video.
 """
 
 import io
@@ -33,87 +31,114 @@ logger = logging.getLogger(__name__)
 
 # ── Processing constants ────────────────────────────────────────────────────
 FRAMES_TO_SKIP = 5
-FACE_SIZE = (128, 128)
-LBPH_CONFIDENCE_THRESHOLD = 100
 PRESENCE_THRESHOLD_PCT = 0.10
+COSINE_THRESHOLD = 0.35          # same threshold as attendance pipeline
+EYE_CLOSED_CONSEC_SECS = 0.5    # seconds of no-eyes to count as one closure episode
 
-# Seconds of consecutive no-eye-detection to count as a closure episode
-EYE_CLOSED_CONSEC_SECS = 0.5
-
-# ── Cascades (loaded once at import) ───────────────────────────────────────
-_CASCADE_PATH = cv2.data.haarcascades
-_FACE_CASCADE = cv2.CascadeClassifier(
-    os.path.join(_CASCADE_PATH, 'haarcascade_frontalface_default.xml')
-)
+# ── Eye cascade (loaded once at import) ────────────────────────────────────
 _EYE_CASCADE = cv2.CascadeClassifier(
-    os.path.join(_CASCADE_PATH, 'haarcascade_eye.xml')
+    os.path.join(cv2.data.haarcascades, 'haarcascade_eye.xml')
 )
 
 
-def _classify(attention_score: float) -> str:
-    if attention_score >= 70:
-        return 'atento'
-    elif attention_score >= 40:
-        return 'distraido'
-    return 'fatigado'
+# ── InsightFace singleton (shared with attendance pipeline) ─────────────────
+def _get_face_app():
+    """Re-use the InsightFace app from the attendance module (same process singleton)."""
+    from apps.attendance.tasks import _get_face_app as _attendance_get_face_app
+    return _attendance_get_face_app()
 
 
-def _build_student_recognizer(encodings):
-    """Train LBPH recognizer from numpy-saved face samples. Returns recognizer or None."""
+# ── Student embedding ───────────────────────────────────────────────────────
+def _build_student_embedding(student):
+    """
+    Load all ArcFace encodings for this student and return a single
+    mean L2-normalized 512-d reference vector.  Returns None if no valid encodings.
+    """
+    encodings = list(student.face_encodings.all())
     if not encodings:
         return None
-    face_images = [np.load(io.BytesIO(bytes(fe.encoding_data))) for fe in encodings]
-    recognizer = cv2.face.LBPHFaceRecognizer_create()
-    recognizer.train(face_images, np.zeros(len(face_images), dtype=np.int32))
-    return recognizer
 
-
-def _select_best_face(faces, gray_eq, recognizer):
-    """Return the face most likely to belong to the student (lowest LBPH confidence)."""
-    if recognizer is None:
-        return max(faces, key=lambda f: f[2] * f[3])
-
-    best_face, best_conf = None, float('inf')
-    for (x, y, w, h) in faces:
-        pad = int(0.1 * min(w, h))
-        x1, y1 = max(0, x - pad), max(0, y - pad)
-        x2, y2 = min(gray_eq.shape[1], x + w + pad), min(gray_eq.shape[0], y + h + pad)
-        face_crop = gray_eq[y1:y2, x1:x2]
-        if face_crop.size == 0:
+    vecs = []
+    for fe in encodings:
+        arr = np.load(io.BytesIO(bytes(fe.encoding_data)), allow_pickle=True)
+        arr = arr.flatten().astype(np.float32)
+        if arr.shape[0] != 512:
+            logger.warning(
+                f"Student {student.id}: encoding shape={arr.shape[0]}, "
+                "expected 512. Re-register face samples."
+            )
             continue
-        try:
-            _, confidence = recognizer.predict(cv2.resize(face_crop, FACE_SIZE))
-            if confidence < LBPH_CONFIDENCE_THRESHOLD and confidence < best_conf:
-                best_conf = confidence
-                best_face = (x, y, w, h)
-        except Exception:
+        norm = np.linalg.norm(arr)
+        if norm > 1e-10:
+            vecs.append(arr / norm)
+
+    if not vecs:
+        return None
+
+    mean_vec = np.mean(vecs, axis=0)
+    norm = np.linalg.norm(mean_vec)
+    result = mean_vec / norm if norm > 1e-10 else mean_vec
+    logger.info(f"Student {student.id}: ArcFace reference built from {len(vecs)} samples.")
+    return result
+
+
+# ── Face identification ─────────────────────────────────────────────────────
+def _find_student_face(faces, student_embedding):
+    """
+    From the list of InsightFace-detected faces, return the one most likely
+    to be the target student (highest cosine similarity ≥ COSINE_THRESHOLD).
+    Returns the face object or None.
+    """
+    best_face = None
+    best_score = -1.0
+
+    for face in faces:
+        if face.det_score < 0.5:
             continue
-    return best_face
+        query = face.embedding.astype(np.float32)
+        norm = np.linalg.norm(query)
+        if norm < 1e-10:
+            continue
+        query = query / norm
+        score = float(np.dot(query, student_embedding))
+        if score > best_score:
+            best_score = score
+            best_face = face
+
+    if best_score >= COSINE_THRESHOLD:
+        return best_face
+    return None
 
 
-def _analyze_eyes(face_crop, state, eye_closed_frames, fps):
+# ── Eye analysis ────────────────────────────────────────────────────────────
+def _analyze_eyes(face_bgr, state, eye_closed_frames, fps):
     """
-    Detect open eyes in the upper 60% of the face.
+    Detect open eyes in the upper 60% of the face crop (BGR).
 
-    Updates:
-      - eye_detected_frames: count of frames where eyes were found
-      - no_eye_counter: consecutive frames without eyes
-      - eyes_closed_secs: accumulated seconds with eyes closed
-      - closure_episodes: count of distinct sustained-closure events
+    Updates state dict:
+      eye_detected_frames  — frames where ≥1 eye was found
+      no_eye_counter       — consecutive frames without eyes
+      eyes_closed_secs     — accumulated closure seconds
+      closure_episodes     — count of distinct sustained-closure events
     """
-    top = face_crop[:int(face_crop.shape[0] * 0.6), :]
+    gray = cv2.cvtColor(face_bgr, cv2.COLOR_BGR2GRAY)
+    gray = cv2.equalizeHist(gray)
+
+    h = gray.shape[0]
+    top = gray[:int(h * 0.6), :]
     if top.size == 0:
         return
-    top_resized = cv2.resize(top, (0, 0), fx=2.0, fy=2.0)
+
+    # 2× upscale gives the cascade a better chance at small eyes
+    top_up = cv2.resize(top, (0, 0), fx=2.0, fy=2.0)
     eyes = _EYE_CASCADE.detectMultiScale(
-        top_resized, scaleFactor=1.1, minNeighbors=3, minSize=(15, 15)
+        top_up, scaleFactor=1.1, minNeighbors=3, minSize=(15, 15)
     )
 
     if len(eyes) == 0:
         state['no_eye_counter'] += 1
         if state['no_eye_counter'] >= eye_closed_frames:
             state['eyes_closed_secs'] += FRAMES_TO_SKIP / fps
-            # Count each distinct episode only when the threshold is first crossed
             if state['no_eye_counter'] == eye_closed_frames:
                 state['closure_episodes'] += 1
     else:
@@ -121,64 +146,8 @@ def _analyze_eyes(face_crop, state, eye_closed_frames, fps):
         state['no_eye_counter'] = 0
 
 
-def _process_single_frame(gray_eq, state, recognizer, use_recognition, eye_closed_frames, fps):
-    """Detect the student's face and run eye analysis."""
-    faces = _FACE_CASCADE.detectMultiScale(
-        gray_eq, scaleFactor=1.1, minNeighbors=4, minSize=(40, 40)
-    )
-    if len(faces) == 0:
-        state['no_eye_counter'] = 0
-        return
-
-    best_face = _select_best_face(faces, gray_eq, recognizer if use_recognition else None)
-    if best_face is None:
-        state['no_eye_counter'] = 0
-        return
-
-    (x, y, w, h) = best_face
-    pad = int(0.1 * min(w, h))
-    x1, y1 = max(0, x - pad), max(0, y - pad)
-    x2, y2 = min(gray_eq.shape[1], x + w + pad), min(gray_eq.shape[0], y + h + pad)
-    face_crop = gray_eq[y1:y2, x1:x2]
-    if face_crop.size == 0:
-        return
-
-    state['face_frames'] += 1
-    _analyze_eyes(face_crop, state, eye_closed_frames, fps)
-
-
-def _run_video_loop(cap, fps, recognizer, use_recognition, state, eye_closed_frames):
-    total_frames = 0
-    processed_frames = 0
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-        total_frames += 1
-        if total_frames % FRAMES_TO_SKIP != 0:
-            continue
-        processed_frames += 1
-        small = cv2.resize(frame, (0, 0), fx=0.5, fy=0.5)
-        gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
-        gray_eq = cv2.equalizeHist(gray)
-        _process_single_frame(gray_eq, state, recognizer, use_recognition, eye_closed_frames, fps)
-    return processed_frames
-
-
+# ── Score computation ───────────────────────────────────────────────────────
 def _compute_scores(state):
-    """
-    PERCLOS-based scoring.
-
-    PERCLOS = fraction of face-visible frames where eyes were NOT detected.
-    Research thresholds (adapted for classroom context):
-      < 0.15  → alert        (attention 70-100)
-      0.15-0.35 → drowsy     (attention 40-69)
-      > 0.35  → very drowsy  (attention < 40)
-
-    Formula:
-      fatigue = min(100, perclos * 200 + closure_episodes * 5)
-      attention = 100 - fatigue
-    """
     face_frames = state['face_frames']
     if face_frames == 0:
         return None
@@ -202,25 +171,30 @@ def _compute_scores(state):
     }
 
 
+def _classify(attention_score: float) -> str:
+    if attention_score >= 70:
+        return 'atento'
+    elif attention_score >= 40:
+        return 'distraido'
+    return 'fatigado'
+
+
+# ── Main processing function ────────────────────────────────────────────────
 def process_individual_fatigue(analysis_id: int, video_path: str) -> None:
     from apps.fatigue.models import IndividualFatigueAnalysis
-    from apps.classrooms.models import FaceEncoding
 
     analysis = None
     try:
-        analysis = IndividualFatigueAnalysis.objects.select_related('student').get(pk=analysis_id)
+        analysis = IndividualFatigueAnalysis.objects.select_related(
+            'student'
+        ).prefetch_related('student__face_encodings').get(pk=analysis_id)
         analysis.status = IndividualFatigueAnalysis.STATUS_PROCESSING
         analysis.save(update_fields=['status'])
 
         student = analysis.student
-        encodings = list(FaceEncoding.objects.filter(student=student))
-        recognizer = _build_student_recognizer(encodings)
-        use_recognition = recognizer is not None
+        student_embedding = _build_student_embedding(student)
 
-        if use_recognition:
-            logger.info(f"Fatigue {analysis_id}: LBPH trained with {len(encodings)} samples.")
-        else:
-            logger.warning(f"Fatigue {analysis_id}: no encodings — using dominant face.")
+        face_app = _get_face_app()
 
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
@@ -237,21 +211,73 @@ def process_individual_fatigue(analysis_id: int, video_path: str) -> None:
             'closure_episodes': 0,
         }
 
-        processed_frames = _run_video_loop(cap, fps, recognizer, use_recognition, state, eye_closed_frames)
+        total_frames = 0
+        processed_frames = 0
+
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            total_frames += 1
+            if total_frames % FRAMES_TO_SKIP != 0:
+                continue
+            processed_frames += 1
+
+            small = cv2.resize(frame, (0, 0), fx=0.5, fy=0.5)
+            faces = face_app.get(small)
+            if not faces:
+                state['no_eye_counter'] = 0
+                continue
+
+            # Find student face using ArcFace cosine similarity
+            if student_embedding is not None:
+                target_face = _find_student_face(faces, student_embedding)
+            else:
+                # No encodings — use largest detected face as fallback
+                target_face = max(faces, key=lambda f: (f.bbox[2]-f.bbox[0])*(f.bbox[3]-f.bbox[1]))
+                logger.warning(
+                    f"Fatigue {analysis_id}: no ArcFace encodings — using dominant face."
+                )
+
+            if target_face is None:
+                state['no_eye_counter'] = 0
+                continue
+
+            # Crop face region from small frame
+            x1, y1, x2, y2 = [int(v) for v in target_face.bbox]
+            h_s, w_s = small.shape[:2]
+            x1 = max(0, x1); y1 = max(0, y1)
+            x2 = min(w_s, x2); y2 = min(h_s, y2)
+
+            face_crop = small[y1:y2, x1:x2]
+            if face_crop.size == 0:
+                continue
+
+            state['face_frames'] += 1
+            _analyze_eyes(face_crop, state, eye_closed_frames, fps)
+
         cap.release()
+        logger.info(
+            f"Fatigue {analysis_id}: {processed_frames} frames processed, "
+            f"face detected in {state['face_frames']} frames."
+        )
 
-        face_frames = state['face_frames']
-        logger.info(f"Fatigue {analysis_id}: {processed_frames} frames processed, face in {face_frames}.")
-
-        if processed_frames > 0 and (face_frames / processed_frames) >= PRESENCE_THRESHOLD_PCT:
+        # Require that the student's face appeared in ≥ PRESENCE_THRESHOLD_PCT of frames
+        if processed_frames > 0 and (state['face_frames'] / processed_frames) >= PRESENCE_THRESHOLD_PCT:
             scores = _compute_scores(state)
-            analysis.attention_score = round(scores['attention'], 2)
-            analysis.fatigue_score = round(scores['fatigue'], 2)
-            analysis.yawn_count = scores['closure_episodes']   # repurposed field
-            analysis.eyes_closed_secs = round(scores['eyes_closed_secs'], 2)
-            analysis.result_label = _classify(scores['attention'])
+            if scores:
+                analysis.attention_score = round(scores['attention'], 2)
+                analysis.fatigue_score = round(scores['fatigue'], 2)
+                analysis.yawn_count = scores['closure_episodes']   # repurposed field
+                analysis.eyes_closed_secs = round(scores['eyes_closed_secs'], 2)
+                analysis.result_label = _classify(scores['attention'])
+            else:
+                analysis.result_label = ''
         else:
-            logger.warning(f"Fatigue {analysis_id}: face below presence threshold.")
+            logger.warning(
+                f"Fatigue {analysis_id}: face below presence threshold "
+                f"({state['face_frames']}/{processed_frames} frames)."
+            )
             analysis.result_label = ''
 
         analysis.status = IndividualFatigueAnalysis.STATUS_COMPLETED

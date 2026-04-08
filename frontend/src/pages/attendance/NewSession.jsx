@@ -1,13 +1,20 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Upload, Loader2, CheckCircle } from 'lucide-react'
 import api from '../../api/axios'
 import PageHeader from '../../components/PageHeader'
+import SearchableSelect from '../../components/SearchableSelect'
 
 export default function NewSession() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const preselectedClassroom = searchParams.get('classroom') || ''
+
   const [classrooms, setClassrooms] = useState([])
-  const [form, setForm] = useState({ classroom: '', date: new Date().toISOString().split('T')[0] })
+  const [form, setForm] = useState({
+    classroom: preselectedClassroom,
+    date: new Date().toISOString().split('T')[0],
+  })
   const [session, setSession] = useState(null)
   const [videoFile, setVideoFile] = useState(null)
   const [status, setStatus] = useState('')
@@ -72,6 +79,11 @@ export default function NewSession() {
     }, 3000)
   }
 
+  const classroomOptions = classrooms.map(c => ({
+    value: String(c.id),
+    label: `${c.name} — ${c.subject}`,
+  }))
+
   return (
     <div className="p-6 max-w-xl mx-auto">
       <PageHeader title="Nueva Sesión de Asistencia" />
@@ -80,17 +92,21 @@ export default function NewSession() {
           <form onSubmit={createSession} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Grupo</label>
-              <select
+              <SearchableSelect
                 value={form.classroom}
-                onChange={(e) => setForm(f => ({ ...f, classroom: e.target.value }))}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                onChange={val => setForm(f => ({ ...f, classroom: val }))}
+                options={classroomOptions}
+                placeholder="Seleccionar grupo..."
+              />
+              {/* Hidden native input so required validation works */}
+              <input
+                type="text"
+                value={form.classroom}
+                onChange={() => {}}
                 required
-              >
-                <option value="">Seleccionar grupo...</option>
-                {classrooms.map(c => (
-                  <option key={c.id} value={c.id}>{c.name} — {c.subject}</option>
-                ))}
-              </select>
+                className="sr-only"
+                tabIndex={-1}
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Fecha</label>
@@ -105,7 +121,7 @@ export default function NewSession() {
             {error && <p className="text-red-600 text-sm">{error}</p>}
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !form.classroom}
               className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-lg transition-colors text-sm"
             >
               {loading ? 'Creando...' : 'Crear Sesión'}

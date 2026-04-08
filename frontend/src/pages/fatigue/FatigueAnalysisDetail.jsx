@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
-import { ChevronLeft, BrainCircuit, ExternalLink, User, Calendar, BookOpen } from 'lucide-react'
+import { useParams, Link, useNavigate } from 'react-router-dom'
+import { ChevronLeft, BrainCircuit, ExternalLink, User, Calendar, BookOpen, Trash2, RefreshCw } from 'lucide-react'
 import api from '../../api/axios'
 import PageHeader from '../../components/PageHeader'
 import StatusBadge from '../../components/StatusBadge'
+import ConfirmDialog from '../../components/ConfirmDialog'
 
 const LABEL_CONFIG = {
   atento:    { bg: 'bg-green-100',  text: 'text-green-800',  label: 'Atento'    },
@@ -30,9 +31,12 @@ function ScoreBar({ score, colorClass, bgClass }) {
 
 export default function FatigueAnalysisDetail() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const [analysis, setAnalysis] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
 
   useEffect(() => {
     api.get(`/fatigue/individual/${id}/`)
@@ -40,6 +44,18 @@ export default function FatigueAnalysisDetail() {
       .catch(err => setError(err.response?.data?.detail || 'Error al cargar el análisis.'))
       .finally(() => setLoading(false))
   }, [id])
+
+  const handleDelete = async () => {
+    setDeleteLoading(true)
+    try {
+      await api.delete(`/fatigue/individual/${id}/delete/`)
+      navigate('/fatigue')
+    } catch (err) {
+      setError(err.response?.data?.error || 'Error al eliminar el análisis.')
+      setDeleteLoading(false)
+      setDeleteConfirm(false)
+    }
+  }
 
   const openReport = async () => {
     try {
@@ -89,14 +105,26 @@ export default function FatigueAnalysisDetail() {
         title={analysis.student_name || 'Análisis'}
         subtitle={`${analysis.classroom_name || ''} — ${analysis.date}`}
         action={
-          hasResults && (
-            <button
-              onClick={openReport}
-              className="bg-purple-600 hover:bg-purple-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm"
-            >
-              <ExternalLink size={15} /> Ver Reporte
-            </button>
-          )
+          <div className="flex items-center gap-2">
+            {analysis?.status !== 'processing' && (
+              <button
+                onClick={() => setDeleteConfirm(true)}
+                disabled={deleteLoading}
+                className="bg-red-100 hover:bg-red-200 text-red-700 font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm disabled:opacity-50"
+              >
+                <Trash2 size={15} />
+                Eliminar
+              </button>
+            )}
+            {hasResults && (
+              <button
+                onClick={openReport}
+                className="bg-purple-600 hover:bg-purple-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm"
+              >
+                <ExternalLink size={15} /> Ver Reporte
+              </button>
+            )}
+          </div>
         }
       />
 
@@ -191,6 +219,16 @@ export default function FatigueAnalysisDetail() {
           <p className="text-sm text-gray-400 mt-1">Los resultados aparecerán aquí cuando el procesamiento termine</p>
         </div>
       )}
+
+      <ConfirmDialog
+        open={deleteConfirm}
+        title="Eliminar análisis"
+        message={`Se eliminará el análisis de ${analysis.student_name} del ${analysis.date}.`}
+        confirmLabel="Eliminar"
+        loading={deleteLoading}
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteConfirm(false)}
+      />
     </div>
   )
 }

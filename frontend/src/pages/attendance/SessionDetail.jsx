@@ -4,6 +4,7 @@ import { ChevronLeft, CheckCircle, XCircle, ClipboardList, ExternalLink, Refresh
 import api from '../../api/axios'
 import PageHeader from '../../components/PageHeader'
 import StatusBadge from '../../components/StatusBadge'
+import ConfirmDialog from '../../components/ConfirmDialog'
 
 export default function SessionDetail() {
   const { id } = useParams()
@@ -16,6 +17,7 @@ export default function SessionDetail() {
   const [retryFile, setRetryFile] = useState(null)
   const [retryLoading, setRetryLoading] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [retryError, setRetryError] = useState('')
   const pollingRef = useRef(null)
 
@@ -81,7 +83,6 @@ export default function SessionDetail() {
   }
 
   const handleDelete = async () => {
-    if (!window.confirm('¿Eliminar esta sesión? Esta acción no se puede deshacer.')) return
     setDeleteLoading(true)
     try {
       await api.delete(`/attendance/sessions/${id}/delete/`)
@@ -89,6 +90,7 @@ export default function SessionDetail() {
     } catch (err) {
       setRetryError(err.response?.data?.error || 'Error al eliminar la sesión.')
       setDeleteLoading(false)
+      setDeleteConfirm(false)
     }
   }
 
@@ -145,7 +147,7 @@ export default function SessionDetail() {
   const isError = session?.status === 'error'
   const isPending = session?.status === 'pending'
   const isProcessing = session?.status === 'processing'
-  const canDelete = isError || isPending
+  const canDelete = !isProcessing
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -170,11 +172,11 @@ export default function SessionDetail() {
           <div className="flex items-center gap-2">
             {canDelete && (
               <button
-                onClick={handleDelete}
+                onClick={() => setDeleteConfirm(true)}
                 disabled={deleteLoading}
                 className="bg-red-100 hover:bg-red-200 text-red-700 font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm disabled:opacity-50"
               >
-                {deleteLoading ? <RefreshCw size={15} className="animate-spin" /> : <Trash2 size={15} />}
+                <Trash2 size={15} />
                 Eliminar sesión
               </button>
             )}
@@ -189,6 +191,14 @@ export default function SessionDetail() {
           </div>
         }
       />
+
+      {/* Delete error (shown regardless of session status) */}
+      {retryError && !isError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-6 text-sm flex items-center gap-2">
+          <AlertTriangle size={15} className="shrink-0" />
+          {retryError}
+        </div>
+      )}
 
       {/* Processing banner */}
       {isProcessing && (
@@ -357,6 +367,20 @@ export default function SessionDetail() {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={deleteConfirm}
+        title="Eliminar sesión"
+        message={
+          isCompleted
+            ? `Se eliminará la sesión del ${session?.date} junto con todos sus registros de asistencia.`
+            : `Se eliminará la sesión del ${session?.date}.`
+        }
+        confirmLabel="Eliminar"
+        loading={deleteLoading}
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteConfirm(false)}
+      />
     </div>
   )
 }

@@ -4,6 +4,7 @@ from .views import (
     IndividualFatigueCreateView,
     IndividualFatigueDetailView,
     IndividualFatigueStatusView,
+    IndividualFatigueDeleteView,
 )
 
 urlpatterns = [
@@ -11,4 +12,5 @@ urlpatterns = [
     path('individual/create/', IndividualFatigueCreateView.as_view(), name='individual-fatigue-create'),
     path('individual/<int:pk>/', IndividualFatigueDetailView.as_view(), name='individual-fatigue-detail'),
     path('individual/<int:pk>/status/', IndividualFatigueStatusView.as_view(), name='individual-fatigue-status'),
+    path('individual/<int:pk>/delete/', IndividualFatigueDeleteView.as_view(), name='individual-fatigue-delete'),
 ]

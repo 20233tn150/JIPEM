@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, BrainCircuit, ArrowRight, User, Calendar, Filter } from 'lucide-react'
+import { Plus, BrainCircuit, ArrowRight, User, Calendar, Search, X, Trash2 } from 'lucide-react'
 import api from '../../api/axios'
 import PageHeader from '../../components/PageHeader'
 import StatusBadge from '../../components/StatusBadge'
+import SearchableSelect from '../../components/SearchableSelect'
+import ConfirmDialog from '../../components/ConfirmDialog'
 
 const LABEL_STYLE = {
   atento:    { bg: 'bg-green-100',  text: 'text-green-700'  },
@@ -15,8 +17,11 @@ export default function FatigueList() {
   const [analyses, setAnalyses] = useState([])
   const [classrooms, setClassrooms] = useState([])
   const [filterClassroom, setFilterClassroom] = useState('')
+  const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [deletingId, setDeletingId] = useState(null)
+  const [confirm, setConfirm] = useState(null) // analysis object
 
   useEffect(() => {
     Promise.all([
@@ -31,9 +36,35 @@ export default function FatigueList() {
       .finally(() => setLoading(false))
   }, [])
 
-  const filtered = filterClassroom
-    ? analyses.filter(a => String(a.classroom_id) === filterClassroom)
-    : analyses
+  const handleDelete = async () => {
+    const a = confirm
+    setDeletingId(a.id)
+    try {
+      await api.delete(`/fatigue/individual/${a.id}/delete/`)
+      setAnalyses(prev => prev.filter(x => x.id !== a.id))
+      setConfirm(null)
+    } catch (err) {
+      setError(err.response?.data?.error || 'Error al eliminar el análisis.')
+      setConfirm(null)
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  const classroomOptions = classrooms.map(c => ({ value: String(c.id), label: c.name }))
+
+  const q = search.toLowerCase()
+  const filtered = analyses.filter(a => {
+    const matchGroup = filterClassroom ? String(a.classroom_id) === filterClassroom : true
+    const matchSearch = !q ||
+      (a.student_name || '').toLowerCase().includes(q) ||
+      (a.student_matricula || '').toLowerCase().includes(q) ||
+      (a.classroom_name || '').toLowerCase().includes(q) ||
+      (a.date || '').includes(q) ||
+      (a.result_label || '').toLowerCase().includes(q) ||
+      (a.status || '').toLowerCase().includes(q)
+    return matchGroup && matchSearch
+  })
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -56,27 +87,39 @@ export default function FatigueList() {
         </div>
       )}
 
-      {/* Filter */}
-      {!loading && classrooms.length > 0 && (
-        <div className="mb-4 flex items-center gap-2">
-          <Filter size={14} className="text-gray-400" />
-          <select
-            value={filterClassroom}
-            onChange={e => setFilterClassroom(e.target.value)}
-            className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:ring-2 focus:ring-purple-500"
-          >
-            <option value="">Todos los grupos</option>
-            {classrooms.map(c => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-          {filterClassroom && (
-            <button
-              onClick={() => setFilterClassroom('')}
-              className="text-xs text-gray-400 hover:text-gray-600"
-            >
-              Limpiar
-            </button>
+      {/* Filters */}
+      {!loading && analyses.length > 0 && (
+        <div className="mb-4 flex flex-col sm:flex-row gap-2">
+          {/* Text search */}
+          <div className="relative flex-1">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Buscar por alumno, matrícula, grupo, fecha..."
+              className="w-full pl-9 pr-9 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-500"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+
+          {/* Group filter */}
+          {classrooms.length > 0 && (
+            <div className="w-full sm:w-56">
+              <SearchableSelect
+                value={filterClassroom}
+                onChange={setFilterClassroom}
+                options={classroomOptions}
+                placeholder="Todos los grupos"
+                ringColor="ring-purple-500"
+              />
+            </div>
           )}
         </div>
       )}
@@ -96,12 +139,10 @@ export default function FatigueList() {
             ))}
           </div>
         </div>
-      ) : filtered.length === 0 ? (
+      ) : analyses.length === 0 ? (
         <div className="bg-white rounded-xl border p-12 text-center">
           <BrainCircuit size={40} className="mx-auto mb-4 text-gray-300" />
-          <p className="text-lg font-medium text-gray-600 mb-1">
-            {filterClassroom ? 'Sin análisis para este grupo' : 'Sin análisis registrados'}
-          </p>
+          <p className="text-lg font-medium text-gray-600 mb-1">Sin análisis registrados</p>
           <p className="text-sm text-gray-400 mb-6">Crea el primer análisis individual de un alumno</p>
           <Link
             to="/fatigue/new"
@@ -109,6 +150,17 @@ export default function FatigueList() {
           >
             <Plus size={14} /> Nuevo Análisis
           </Link>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="bg-white rounded-xl border p-10 text-center text-gray-400">
+          <Search size={28} className="mx-auto mb-3 opacity-30" />
+          <p className="text-sm">Sin resultados para los filtros aplicados</p>
+          <button
+            onClick={() => { setSearch(''); setFilterClassroom('') }}
+            className="mt-2 text-xs text-purple-600 hover:underline"
+          >
+            Limpiar filtros
+          </button>
         </div>
       ) : (
         <div className="bg-white rounded-xl border overflow-hidden">
@@ -122,7 +174,7 @@ export default function FatigueList() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Atención</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Resultado</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ver</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -173,12 +225,24 @@ export default function FatigueList() {
                         ) : <span className="text-gray-300 text-xs">—</span>}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <Link
-                          to={`/fatigue/individual/${a.id}`}
-                          className="inline-flex items-center gap-1 text-purple-600 hover:text-purple-800 text-xs font-medium px-2.5 py-1.5 rounded hover:bg-purple-50 transition-colors"
-                        >
-                          Ver <ArrowRight size={12} />
-                        </Link>
+                        <div className="flex items-center justify-end gap-1">
+                          <Link
+                            to={`/fatigue/individual/${a.id}`}
+                            className="inline-flex items-center gap-1 text-purple-600 hover:text-purple-800 text-xs font-medium px-2.5 py-1.5 rounded hover:bg-purple-50 transition-colors"
+                          >
+                            Ver <ArrowRight size={12} />
+                          </Link>
+                          {a.status !== 'processing' && (
+                            <button
+                              onClick={() => setConfirm(a)}
+                              disabled={deletingId === a.id}
+                              className="inline-flex items-center gap-1 text-red-500 hover:text-red-700 text-xs font-medium px-2.5 py-1.5 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
+                              title="Eliminar análisis"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   )
@@ -188,6 +252,16 @@ export default function FatigueList() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!confirm}
+        title="Eliminar análisis"
+        message={confirm ? `Se eliminará el análisis de ${confirm.student_name} del ${confirm.date}.` : ''}
+        confirmLabel="Eliminar"
+        loading={deletingId === confirm?.id}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirm(null)}
+      />
     </div>
   )
 }
