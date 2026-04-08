@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { ChevronLeft, Loader2, Play, Activity, Eye, Smile, User, Users } from 'lucide-react'
 import api from '../../api/axios'
 import PageHeader from '../../components/PageHeader'
+import SearchableSelect from '../../components/SearchableSelect'
 
 export default function NewFatigueAnalysis() {
   const navigate = useNavigate()
@@ -24,8 +25,7 @@ export default function NewFatigueAnalysis() {
     return () => clearInterval(pollingRef.current)
   }, [])
 
-  const handleClassroomChange = (e) => {
-    const id = e.target.value
+  const handleClassroomChange = (id) => {
     setSelectedClassroom(id)
     setSelectedStudent('')
     setStudents([])
@@ -79,6 +79,16 @@ export default function NewFatigueAnalysis() {
     }, 3000)
   }
 
+  const classroomOptions = classrooms.map(c => ({
+    value: String(c.id),
+    label: `${c.name} — ${c.subject}`,
+  }))
+
+  const studentOptions = students.map(s => ({
+    value: String(s.id),
+    label: `${s.name} — ${s.matricula}`,
+  }))
+
   if (processingStatus === 'processing') {
     const studentObj = students.find(s => String(s.id) === String(selectedStudent))
     return (
@@ -131,17 +141,13 @@ export default function NewFatigueAnalysis() {
             <label className="block text-sm font-medium text-gray-700 mb-1.5 flex items-center gap-1.5">
               <Users size={14} className="text-gray-400" /> Grupo
             </label>
-            <select
+            <SearchableSelect
               value={selectedClassroom}
               onChange={handleClassroomChange}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none text-sm"
-              required
-            >
-              <option value="">Seleccionar grupo...</option>
-              {classrooms.map(c => (
-                <option key={c.id} value={c.id}>{c.name} — {c.subject}</option>
-              ))}
-            </select>
+              options={classroomOptions}
+              placeholder="Seleccionar grupo..."
+              ringColor="ring-purple-500"
+            />
           </div>
 
           {/* Alumno */}
@@ -149,20 +155,20 @@ export default function NewFatigueAnalysis() {
             <label className="block text-sm font-medium text-gray-700 mb-1.5 flex items-center gap-1.5">
               <User size={14} className="text-gray-400" /> Alumno
             </label>
-            <select
+            <SearchableSelect
               value={selectedStudent}
-              onChange={e => setSelectedStudent(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none text-sm disabled:bg-gray-50 disabled:text-gray-400"
-              required
+              onChange={setSelectedStudent}
+              options={studentOptions}
+              placeholder={
+                loadingStudents
+                  ? 'Cargando alumnos...'
+                  : selectedClassroom
+                    ? 'Seleccionar alumno...'
+                    : 'Primero selecciona un grupo'
+              }
               disabled={!selectedClassroom || loadingStudents}
-            >
-              <option value="">
-                {loadingStudents ? 'Cargando alumnos...' : selectedClassroom ? 'Seleccionar alumno...' : 'Primero selecciona un grupo'}
-              </option>
-              {students.map(s => (
-                <option key={s.id} value={s.id}>{s.name} — {s.matricula}</option>
-              ))}
-            </select>
+              ringColor="ring-purple-500"
+            />
             {selectedClassroom && !loadingStudents && students.length === 0 && (
               <p className="text-xs text-amber-600 mt-1">Este grupo no tiene alumnos registrados.</p>
             )}

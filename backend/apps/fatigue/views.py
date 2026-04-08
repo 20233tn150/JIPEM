@@ -120,3 +120,23 @@ class IndividualFatigueStatusView(APIView):
             'status': analysis.status,
             'error_message': analysis.error_message,
         })
+
+
+class IndividualFatigueDeleteView(APIView):
+    """Elimina un análisis individual (cualquier estado excepto procesando)."""
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, pk):
+        qs = IndividualFatigueAnalysis.objects.all()
+        if not request.user.is_admin:
+            qs = qs.filter(maestro=request.user)
+        analysis = get_object_or_404(qs, pk=pk)
+
+        if analysis.status == IndividualFatigueAnalysis.STATUS_PROCESSING:
+            return Response(
+                {'error': 'No se puede eliminar un análisis en procesamiento.'},
+                status=400,
+            )
+
+        analysis.delete()
+        return Response(status=204)

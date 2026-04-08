@@ -31,7 +31,7 @@ class SessionListCreateView(generics.ListCreateAPIView):
     def get_queryset(self):
         qs = AttendanceSession.objects.select_related(
             'classroom', 'maestro'
-        ).prefetch_related('records')
+        ).prefetch_related('records').filter(classroom__is_active=True)
         if not self.request.user.is_admin:
             qs = qs.filter(maestro=self.request.user)
         return qs.order_by('-created_at')
@@ -52,7 +52,7 @@ class SessionDetailView(generics.RetrieveAPIView):
     def get_queryset(self):
         qs = AttendanceSession.objects.select_related(
             'classroom', 'maestro'
-        ).prefetch_related('records__student')
+        ).prefetch_related('records__student').filter(classroom__is_active=True)
         if not self.request.user.is_admin:
             qs = qs.filter(maestro=self.request.user)
         return qs
@@ -140,7 +140,7 @@ class SessionStatusView(APIView):
 
 
 class SessionDeleteView(APIView):
-    """Elimina una sesión en estado pending o error."""
+    """Elimina una sesión (cualquier estado excepto procesando)."""
     permission_classes = [IsAuthenticated]
 
     def delete(self, request, session_id):
@@ -152,11 +152,6 @@ class SessionDeleteView(APIView):
         if session.status == AttendanceSession.STATUS_PROCESSING:
             return Response(
                 {'error': 'No se puede eliminar una sesión en procesamiento.'},
-                status=400,
-            )
-        if session.status == AttendanceSession.STATUS_COMPLETED:
-            return Response(
-                {'error': 'No se puede eliminar una sesión completada.'},
                 status=400,
             )
 

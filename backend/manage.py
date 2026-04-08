@@ -3,6 +3,13 @@
 import os
 import sys
 
+# PyMySQL as MySQLdb replacement — pure Python, no compilation required.
+try:
+    import pymysql
+    pymysql.install_as_MySQLdb()
+except ImportError:
+    pass
+
 
 def main():
     """Run administrative tasks."""

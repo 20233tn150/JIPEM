@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, BookOpen, Trash2, ArrowRight } from 'lucide-react'
+import { Plus, BookOpen, Trash2, ArrowRight, Search, X } from 'lucide-react'
 import api from '../../api/axios'
 import PageHeader from '../../components/PageHeader'
 
@@ -10,11 +10,17 @@ export default function ClassroomList() {
   const [classrooms, setClassrooms] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [search, setSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
   const [formError, setFormError] = useState('')
   const [formLoading, setFormLoading] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
+
+  const visibleClassrooms = classrooms.filter(c => {
+    const q = search.toLowerCase()
+    return c.name.toLowerCase().includes(q) || c.subject.toLowerCase().includes(q)
+  })
 
   useEffect(() => {
     fetchClassrooms()
@@ -92,6 +98,27 @@ export default function ClassroomList() {
         </div>
       )}
 
+      {/* Search bar */}
+      {!loading && classrooms.length > 0 && (
+        <div className="mb-4 relative">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar por nombre o materia..."
+            className="w-full pl-9 pr-9 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <X size={13} />
+            </button>
+          )}
+        </div>
+      )}
+
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map(i => (
@@ -114,9 +141,14 @@ export default function ClassroomList() {
             <Plus size={14} /> Crear Grupo
           </button>
         </div>
+      ) : visibleClassrooms.length === 0 ? (
+        <div className="bg-white rounded-xl border p-10 text-center text-gray-400">
+          <Search size={28} className="mx-auto mb-3 opacity-30" />
+          <p className="text-sm">Sin resultados para "<strong>{search}</strong>"</p>
+        </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {classrooms.map(classroom => (
+          {visibleClassrooms.map(classroom => (
             <div key={classroom.id} className="bg-white rounded-xl border hover:shadow-md transition-shadow flex flex-col">
               <div className="p-5 flex-1">
                 <div className="flex items-start justify-between mb-3">

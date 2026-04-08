@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, ClipboardList, ArrowRight, Users, Calendar } from 'lucide-react'
+import { Plus, ClipboardList, ArrowRight, Users, Calendar, Search, X } from 'lucide-react'
 import api from '../../api/axios'
 import PageHeader from '../../components/PageHeader'
 
@@ -8,6 +8,7 @@ export default function SessionList() {
   const [sessions, setSessions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     api.get('/attendance/sessions/')
@@ -30,8 +31,13 @@ export default function SessionList() {
     return acc
   }, {})
 
-  const groups = Object.values(groupsByClassroom).sort((a, b) =>
+  const allGroups = Object.values(groupsByClassroom).sort((a, b) =>
     a.classroom_name.localeCompare(b.classroom_name)
+  )
+
+  const q = search.toLowerCase()
+  const groups = allGroups.filter(g =>
+    g.classroom_name.toLowerCase().includes(q)
   )
 
   return (
@@ -55,6 +61,27 @@ export default function SessionList() {
         </div>
       )}
 
+      {/* Search bar */}
+      {!loading && allGroups.length > 0 && (
+        <div className="mb-4 relative">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar grupo..."
+            className="w-full pl-9 pr-9 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <X size={13} />
+            </button>
+          )}
+        </div>
+      )}
+
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map(i => (
@@ -65,7 +92,7 @@ export default function SessionList() {
             </div>
           ))}
         </div>
-      ) : groups.length === 0 ? (
+      ) : allGroups.length === 0 ? (
         <div className="bg-white rounded-xl border p-12 text-center">
           <ClipboardList size={40} className="mx-auto mb-4 text-gray-300" />
           <p className="text-lg font-medium text-gray-600 mb-1">Sin sesiones registradas</p>
@@ -76,6 +103,11 @@ export default function SessionList() {
           >
             <Plus size={14} /> Nueva Sesión
           </Link>
+        </div>
+      ) : groups.length === 0 ? (
+        <div className="bg-white rounded-xl border p-10 text-center text-gray-400">
+          <Search size={28} className="mx-auto mb-3 opacity-30" />
+          <p className="text-sm">Sin resultados para "<strong>{search}</strong>"</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

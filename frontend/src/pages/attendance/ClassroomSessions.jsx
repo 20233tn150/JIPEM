@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ChevronLeft, Plus, ClipboardList, Upload, ArrowRight } from 'lucide-react'
+import { ChevronLeft, Plus, ClipboardList, Upload, ArrowRight, Search, X, Trash2 } from 'lucide-react'
 import api from '../../api/axios'
 import PageHeader from '../../components/PageHeader'
 import StatusBadge from '../../components/StatusBadge'
+import ConfirmDialog from '../../components/ConfirmDialog'
 
 export default function ClassroomSessions() {
   const { classroomId } = useParams()
@@ -13,6 +14,9 @@ export default function ClassroomSessions() {
   const [error, setError] = useState('')
   const [uploadingId, setUploadingId] = useState(null)
   const [uploadError, setUploadError] = useState('')
+  const [search, setSearch] = useState('')
+  const [deletingId, setDeletingId] = useState(null)
+  const [confirm, setConfirm] = useState(null) // { session }
 
   useEffect(() => {
     fetchSessions()
@@ -35,6 +39,26 @@ export default function ClassroomSessions() {
       setError(err.response?.data?.detail || 'Error al cargar sesiones.')
     } finally {
       setLoading(false)
+      setDeletingId(null)
+    }
+  }
+
+  const confirmDelete = (session) => {
+    setUploadError('')
+    setConfirm({ session })
+  }
+
+  const handleDelete = async () => {
+    const session = confirm.session
+    setDeletingId(session.id)
+    try {
+      await api.delete(`/attendance/sessions/${session.id}/delete/`)
+      setConfirm(null)
+      fetchSessions()
+    } catch (err) {
+      setUploadError(err.response?.data?.error || err.response?.data?.detail || 'Error al eliminar la sesión.')
+      setConfirm(null)
+      setDeletingId(null)
     }
   }
 
@@ -56,6 +80,12 @@ export default function ClassroomSessions() {
     }
   }
 
+  const q = search.toLowerCase()
+  const visible = sessions.filter(s =>
+    s.date.includes(q) ||
+    (s.status || '').toLowerCase().includes(q)
+  )
+
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <div className="mb-3">
@@ -69,7 +99,7 @@ export default function ClassroomSessions() {
         subtitle="Sesiones de asistencia ordenadas por fecha"
         action={
           <Link
-            to="/attendance/new"
+            to={`/attendance/new?classroom=${classroomId}`}
             className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm"
           >
             <Plus size={15} /> Nueva Sesión
@@ -88,6 +118,27 @@ export default function ClassroomSessions() {
         </div>
       )}
 
+      {/* Search bar */}
+      {!loading && sessions.length > 0 && (
+        <div className="mb-4 relative">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Filtrar por fecha o estado..."
+            className="w-full pl-9 pr-9 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <X size={13} />
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="bg-white rounded-xl border overflow-hidden">
         {loading ? (
           <div className="p-8 text-center text-gray-400">
@@ -100,11 +151,16 @@ export default function ClassroomSessions() {
             <p className="text-lg font-medium text-gray-600 mb-1">Sin sesiones para este grupo</p>
             <p className="text-sm text-gray-400 mb-6">Crea una nueva sesión de asistencia</p>
             <Link
-              to="/attendance/new"
+              to={`/attendance/new?classroom=${classroomId}`}
               className="inline-flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
             >
               <Plus size={14} /> Nueva Sesión
             </Link>
+          </div>
+        ) : visible.length === 0 ? (
+          <div className="p-8 text-center text-gray-400">
+            <Search size={28} className="mx-auto mb-3 opacity-30" />
+            <p className="text-sm">Sin resultados para "<strong>{search}</strong>"</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -118,7 +174,7 @@ export default function ClassroomSessions() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {sessions.map(session => (
+                {visible.map(session => (
                   <tr key={session.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 font-medium text-gray-900">{session.date}</td>
                     <td className="px-6 py-4">
@@ -133,7 +189,7 @@ export default function ClassroomSessions() {
                       ) : '—'}
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex items-center justify-end gap-1">
                         <Link
                           to={`/attendance/${session.id}`}
                           className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-xs font-medium px-2.5 py-1.5 rounded hover:bg-blue-50 transition-colors"
@@ -155,6 +211,16 @@ export default function ClassroomSessions() {
                             />
                           </label>
                         )}
+                        {session.status !== 'processing' && (
+                          <button
+                            onClick={() => confirmDelete(session)}
+                            disabled={deletingId === session.id}
+                            className="inline-flex items-center gap-1 text-red-500 hover:text-red-700 text-xs font-medium px-2.5 py-1.5 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
+                            title="Eliminar sesión"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -164,6 +230,20 @@ export default function ClassroomSessions() {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={!!confirm}
+        title="Eliminar sesión"
+        message={
+          confirm?.session.status === 'completed'
+            ? `Se eliminará la sesión del ${confirm.session.date} junto con todos sus registros de asistencia.`
+            : `Se eliminará la sesión del ${confirm?.session.date}.`
+        }
+        confirmLabel="Eliminar"
+        loading={deletingId === confirm?.session?.id}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirm(null)}
+      />
     </div>
   )
 }
