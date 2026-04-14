@@ -157,7 +157,7 @@ class CaptureFaceView(APIView):
         FaceEncoding.objects.create(student=student, encoding_data=buf.getvalue())
 
         count = student.face_encodings.count()
-        logger.info(f"Face sample saved for student {student.id} (total: {count}).")
+        logger.info("Face sample saved for student {} (total: {}).", student.id, count)
         return Response({
             'message': 'Muestra facial guardada correctamente.',
             'sample_count': count,
