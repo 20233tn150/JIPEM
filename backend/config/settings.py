@@ -24,6 +24,7 @@ INSTALLED_APPS = [
     'apps.attendance',
     'apps.fatigue',
     'apps.reports',
+    'apps.dashboards',
     'apps.logs',
     'corsheaders',
 ]
