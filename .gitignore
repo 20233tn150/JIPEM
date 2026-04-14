@@ -33,3 +33,10 @@ Thumbs.db
 .idea/
 *.suo
 *.user
+
+# Deployment notes (contienen tokens/credenciales)
+frontend/d.md
+
+# Logs de loguru
+/backend/logs/*.log
+/backend/logs/*.zip
