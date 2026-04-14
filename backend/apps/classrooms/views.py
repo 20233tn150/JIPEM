@@ -14,8 +14,7 @@ from rest_framework.views import APIView
 from .models import Classroom, Student, FaceEncoding
 from .serializers import ClassroomSerializer, StudentSerializer, FaceStatusSerializer
 
-import logging
-logger = logging.getLogger(__name__)
+from loguru import logger
 
 # ── InsightFace singleton ────────────────────────────────────────────────────
 _face_app = None

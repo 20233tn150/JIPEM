@@ -1,6 +1,5 @@
 import os
 import uuid
-import logging
 
 from django.conf import settings
 from django.shortcuts import get_object_or_404
@@ -9,11 +8,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from loguru import logger
 from .models import IndividualFatigueAnalysis
 from .serializers import IndividualFatigueAnalysisSerializer
 from .tasks import start_individual_fatigue_processing
-
-logger = logging.getLogger(__name__)
 
 ALLOWED_EXTENSIONS = {'.mp4', '.avi', '.mov', '.mkv'}
 MAX_UPLOAD_SIZE = getattr(settings, 'MAX_UPLOAD_SIZE', 500 * 1024 * 1024)
