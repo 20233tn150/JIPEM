@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ChevronLeft, CheckCircle, XCircle, ClipboardList, ExternalLink, RefreshCw, Upload, Trash2, AlertTriangle } from 'lucide-react'
+import { ChevronLeft, CheckCircle, XCircle, ClipboardList, ExternalLink, RefreshCw, Upload, Trash2, AlertTriangle, Download } from 'lucide-react'
 import api from '../../api/axios'
 import PageHeader from '../../components/PageHeader'
 import StatusBadge from '../../components/StatusBadge'
@@ -20,6 +20,7 @@ export default function SessionDetail() {
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [retryError, setRetryError] = useState('')
   const pollingRef = useRef(null)
+  const [pdfLoading, setPdfLoading] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -64,7 +65,6 @@ export default function SessionDetail() {
       const blob = new Blob([res.data], { type: 'text/html' })
       window.open(URL.createObjectURL(blob), '_blank')
     } catch {
-      // silently fail
     }
   }
 
@@ -76,10 +76,54 @@ export default function SessionDetail() {
         prev.map(r => r.id === record.id ? { ...r, is_present: res.data.is_present } : r)
       )
     } catch {
-      // silently fail — UI stays unchanged
     } finally {
       setToggling(null)
     }
+  }
+
+  const downloadPDF = async () => {
+    setPdfLoading(true)
+    try {
+      const res = await api.get(`/reports/attendance/pdf/`, {
+        params: { session_id: id },
+        responseType: 'blob'
+      });
+
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Reporte_Asistencia_${session.classroom_name || id}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Error al descargar PDF:", err);
+      alert("No se pudo generar el archivo PDF.");
+    } finally {
+      setPdfLoading(false)
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="p-6 max-w-3xl mx-auto space-y-4 animate-pulse">
+        <div className="h-8 bg-gray-200 rounded w-48" />
+        <div className="h-32 bg-gray-100 rounded-xl" />
+        <div className="h-48 bg-gray-100 rounded-xl" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 max-w-3xl mx-auto">
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">{error}</div>
+        <Link to="/attendance" className="text-blue-600 hover:underline text-sm flex items-center gap-1">
+          <ChevronLeft size={14} /> Volver
+        </Link>
+      </div>
+    )
   }
 
   const handleDelete = async () => {
@@ -181,18 +225,32 @@ export default function SessionDetail() {
               </button>
             )}
             {isCompleted && (
-              <button
-                onClick={openReport}
-                className="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm"
-              >
-                <ExternalLink size={15} /> Ver Reporte
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={openReport}
+                  className="bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm"
+                >
+                  <ExternalLink size={15} /> Ver HTML
+                </button>
+
+                <button
+                  onClick={downloadPDF}
+                  disabled={pdfLoading}
+                  className="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  {pdfLoading ? (
+                    <RefreshCw size={15} className="animate-spin" />
+                  ) : (
+                    <Download size={15} />
+                  )}
+                  {pdfLoading ? 'Generando...' : 'Descargar PDF'}
+                </button>
+              </div>
             )}
           </div>
         }
       />
 
-      {/* Delete error (shown regardless of session status) */}
       {retryError && !isError && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-6 text-sm flex items-center gap-2">
           <AlertTriangle size={15} className="shrink-0" />
@@ -200,7 +258,6 @@ export default function SessionDetail() {
         </div>
       )}
 
-      {/* Processing banner */}
       {isProcessing && (
         <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-xl mb-6 flex items-center gap-3 text-sm">
           <RefreshCw size={16} className="animate-spin flex-shrink-0" />
@@ -208,7 +265,6 @@ export default function SessionDetail() {
         </div>
       )}
 
-      {/* Error recovery panel */}
       {isError && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-5 mb-6">
           <div className="flex items-start gap-3 mb-4">
@@ -246,7 +302,6 @@ export default function SessionDetail() {
         </div>
       )}
 
-      {/* Session Info */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-xl border p-4">
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Grupo</p>
@@ -273,7 +328,6 @@ export default function SessionDetail() {
         </div>
       </div>
 
-      {/* Attendance Bar */}
       {totalCount > 0 && (
         <div className="bg-white rounded-xl border p-4 mb-6">
           <div className="flex items-center justify-between mb-2">
@@ -292,7 +346,7 @@ export default function SessionDetail() {
         </div>
       )}
 
-      {/* Records Table */}
+
       <div className="bg-white rounded-xl border overflow-hidden">
         <div className="px-6 py-4 border-b flex items-center justify-between">
           <h2 className="text-base font-semibold text-gray-900">Registro de Asistencia</h2>
@@ -333,11 +387,10 @@ export default function SessionDetail() {
                           onClick={() => handleToggle(record)}
                           disabled={toggling === record.id}
                           title="Haz clic para cambiar manualmente"
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all hover:ring-2 hover:ring-offset-1 disabled:opacity-50 ${
-                            record.is_present
-                              ? 'bg-green-100 text-green-800 hover:ring-green-400'
-                              : 'bg-red-100 text-red-800 hover:ring-red-400'
-                          }`}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all hover:ring-2 hover:ring-offset-1 disabled:opacity-50 ${record.is_present
+                            ? 'bg-green-100 text-green-800 hover:ring-green-400'
+                            : 'bg-red-100 text-red-800 hover:ring-red-400'
+                            }`}
                         >
                           {toggling === record.id ? (
                             <RefreshCw size={11} className="animate-spin" />

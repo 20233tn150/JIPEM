@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ChevronLeft, BrainCircuit, ExternalLink, User, Calendar, BookOpen, Trash2, RefreshCw } from 'lucide-react'
+import { ChevronLeft, BrainCircuit, ExternalLink, User, Calendar, BookOpen, Trash2, RefreshCw, Download } from 'lucide-react'
 import api from '../../api/axios'
 import PageHeader from '../../components/PageHeader'
 import StatusBadge from '../../components/StatusBadge'
 import ConfirmDialog from '../../components/ConfirmDialog'
 
 const LABEL_CONFIG = {
-  atento:    { bg: 'bg-green-100',  text: 'text-green-800',  label: 'Atento'    },
-  fatigado:  { bg: 'bg-red-100',    text: 'text-red-800',    label: 'Fatigado'  },
-  distraido: { bg: 'bg-amber-100',  text: 'text-amber-800',  label: 'Distraído' },
+  atento: { bg: 'bg-green-100', text: 'text-green-800', label: 'Atento' },
+  fatigado: { bg: 'bg-red-100', text: 'text-red-800', label: 'Fatigado' },
+  distraido: { bg: 'bg-amber-100', text: 'text-amber-800', label: 'Distraído' },
 }
 
 function ScoreBar({ score, colorClass, bgClass }) {
@@ -37,6 +37,7 @@ export default function FatigueAnalysisDetail() {
   const [error, setError] = useState('')
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const [pdfLoading, setPdfLoading] = useState(false)
 
   useEffect(() => {
     api.get(`/fatigue/individual/${id}/`)
@@ -66,6 +67,30 @@ export default function FatigueAnalysisDetail() {
       // silently fail
     }
   }
+
+  const downloadPDF = async () => {
+    setPdfLoading(true);
+    try {
+      const res = await api.get(`/reports/fatigue/individual/pdf/`, {
+        params: { analysis_id: id },
+        responseType: 'blob'
+      });
+
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Reporte_Fatiga_${analysis.student_name || id}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Error al descargar PDF:", err);
+      alert("No se pudo generar el archivo PDF.");
+    } finally {
+      setPdfLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -117,12 +142,27 @@ export default function FatigueAnalysisDetail() {
               </button>
             )}
             {hasResults && (
-              <button
-                onClick={openReport}
-                className="bg-purple-600 hover:bg-purple-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm"
-              >
-                <ExternalLink size={15} /> Ver Reporte
-              </button>
+              <>
+                <button
+                  onClick={openReport}
+                  className="bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm"
+                >
+                  <ExternalLink size={15} /> Ver HTML
+                </button>
+
+                <button
+                  onClick={downloadPDF}
+                  disabled={pdfLoading}
+                  className="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  {pdfLoading ? (
+                    <RefreshCw size={15} className="animate-spin" />
+                  ) : (
+                    <Download size={15} />
+                  )}
+                  {pdfLoading ? 'Generando...' : 'Descargar PDF'}
+                </button>
+              </>
             )}
           </div>
         }

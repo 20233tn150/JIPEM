@@ -7,4 +7,6 @@ urlpatterns = [
     path('api/attendance/', include('apps.attendance.urls')),
     path('api/classrooms/', include('apps.classrooms.urls')),
     path('api/fatigue/', include('apps.fatigue.urls')),
+    path('api/reports/', include('apps.reports.urls')),
+    path('api/dashboards/', include('apps.dashboards.urls')),
 ]
