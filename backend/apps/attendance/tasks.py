@@ -47,9 +47,9 @@ def _get_face_app():
                     )
                     app.prepare(ctx_id=-1, det_size=(320, 320))
                     _face_app = app
-                    logger.info("InsightFace buffalo_l loaded (detection+recognition only).")
+                    logger.bind(pipeline=True).info("InsightFace buffalo_l loaded (detection+recognition only).")
                 except Exception as exc:
-                    logger.critical("Failed to load InsightFace model: {}", exc)
+                    logger.bind(pipeline=True).critical("Failed to load InsightFace model: {}", exc)
                     raise
     return _face_app
 
@@ -202,7 +202,7 @@ def process_attendance_video(session_id: int, video_path: str) -> None:
         _finalize_session(session, students, presence_map, log)
 
     except Exception as exc:
-        log.exception("Error processing session: {}", exc)
+        log.exception("Error processing session.")
         if session:
             session.status = AttendanceSession.STATUS_ERROR
             session.error_message = str(exc)
