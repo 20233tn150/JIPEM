@@ -21,19 +21,11 @@ from pathlib import Path
 from decouple import config
 from loguru import logger
 
-LOG_LEVEL: str = config('LOG_LEVEL', default='INFO').upper()
-LOGS_DIR: Path = Path(__file__).resolve().parent.parent / 'logs'
-
 CONSOLE_FORMAT = (
     "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
     "<level>{level: <8}</level> | "
     "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
     "{message}"
-)
-
-FILE_FORMAT = (
-    "{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | "
-    "{name}:{function}:{line} | {message}"
 )
 
 
@@ -51,6 +43,9 @@ class InterceptHandler(logging.Handler):
             frame = frame.f_back
             depth += 1
 
+        if frame is None:
+            depth = 1
+
         logger.opt(depth=depth, exception=record.exc_info).log(
             level, record.getMessage()
         )
@@ -58,7 +53,10 @@ class InterceptHandler(logging.Handler):
 
 def setup_logging() -> None:
     """Inicializa loguru con los tres sinks e instala InterceptHandler en stdlib."""
-    LOGS_DIR.mkdir(exist_ok=True)
+    log_level: str = config('LOG_LEVEL', default='INFO').upper()
+    logs_dir: Path = Path(__file__).resolve().parent.parent / 'logs'
+
+    logs_dir.mkdir(parents=True, exist_ok=True)
 
     # Eliminar el sink por defecto de loguru (stderr sin formato)
     logger.remove()
@@ -66,16 +64,15 @@ def setup_logging() -> None:
     # ── Sink 1: Consola ──────────────────────────────────────────────────────
     logger.add(
         sys.stderr,
-        level=LOG_LEVEL,
+        level=log_level,
         format=CONSOLE_FORMAT,
         colorize=True,
     )
 
     # ── Sink 2: app.log — INFO+, todo excepto pipeline ───────────────────────
     logger.add(
-        LOGS_DIR / 'app.log',
+        logs_dir / 'app.log',
         level='INFO',
-        format=FILE_FORMAT,
         rotation='10 MB',
         retention='7 days',
         compression='zip',
@@ -86,9 +83,8 @@ def setup_logging() -> None:
 
     # ── Sink 3: cv_pipeline.log — DEBUG+, solo pipeline=True ─────────────────
     logger.add(
-        LOGS_DIR / 'cv_pipeline.log',
+        logs_dir / 'cv_pipeline.log',
         level='DEBUG',
-        format=FILE_FORMAT,
         rotation='20 MB',
         retention='14 days',
         compression='zip',
@@ -102,5 +98,5 @@ def setup_logging() -> None:
 
     logger.info(
         "Logging configured — level={} logs_dir={}",
-        LOG_LEVEL, LOGS_DIR,
+        log_level, logs_dir,
     )
