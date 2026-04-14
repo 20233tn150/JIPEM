@@ -21,6 +21,8 @@ from pathlib import Path
 from decouple import config
 from loguru import logger
 
+_configured: bool = False
+
 CONSOLE_FORMAT = (
     "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
     "<level>{level: <8}</level> | "
@@ -53,6 +55,11 @@ class InterceptHandler(logging.Handler):
 
 def setup_logging() -> None:
     """Inicializa loguru con los tres sinks e instala InterceptHandler en stdlib."""
+    global _configured
+    if _configured:
+        return
+    _configured = True
+
     log_level: str = config('LOG_LEVEL', default='INFO').upper()
     logs_dir: Path = Path(__file__).resolve().parent.parent / 'logs'
 
