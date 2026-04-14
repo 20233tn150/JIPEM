@@ -40,3 +40,4 @@ frontend/d.md
 # Logs de loguru
 /backend/logs/*.log
 /backend/logs/*.zip
+/backend/logs/*.gz
