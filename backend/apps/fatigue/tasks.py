@@ -47,7 +47,7 @@ def _get_face_app():
 
 
 # ── Student embedding ───────────────────────────────────────────────────────
-def _build_student_embedding(student):
+def _build_student_embedding(student, log):
     """
     Load all ArcFace encodings for this student and return a single
     mean L2-normalized 512-d reference vector. Returns None if no valid encodings.
@@ -61,7 +61,7 @@ def _build_student_embedding(student):
         arr = np.load(io.BytesIO(bytes(fe.encoding_data)), allow_pickle=True)
         arr = arr.flatten().astype(np.float32)
         if arr.shape[0] != 512:
-            logger.bind(pipeline=True).warning(
+            log.warning(
                 "Student {}: encoding shape={}, expected 512. Re-register face samples.",
                 student.id, arr.shape[0],
             )
@@ -76,7 +76,7 @@ def _build_student_embedding(student):
     mean_vec = np.mean(vecs, axis=0)
     norm = np.linalg.norm(mean_vec)
     result = mean_vec / norm if norm > 1e-10 else mean_vec
-    logger.bind(pipeline=True).info(
+    log.info(
         "Student {}: ArcFace reference built from {} samples.", student.id, len(vecs)
     )
     return result
@@ -196,7 +196,12 @@ def process_individual_fatigue(analysis_id: int, video_path: str) -> None:
         )
 
         student = analysis.student
-        student_embedding = _build_student_embedding(student)
+        student_embedding = _build_student_embedding(student, log)
+        if student_embedding is None:
+            log.warning(
+                "No ArcFace encodings for student {} — will use dominant face as fallback.",
+                student.id,
+            )
 
         face_app = _get_face_app()
 
@@ -237,11 +242,11 @@ def process_individual_fatigue(analysis_id: int, video_path: str) -> None:
             if student_embedding is not None:
                 target_face = _find_student_face(faces, student_embedding)
             else:
+                # No encodings — use largest detected face as fallback
                 target_face = max(
                     faces,
                     key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]),
                 )
-                log.warning("No ArcFace encodings — using dominant face as fallback.")
 
             if target_face is None:
                 state['no_eye_counter'] = 0
