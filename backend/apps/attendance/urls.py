@@ -1,8 +1,9 @@
+#backend > apps > attendance > urls.py
 from django.urls import path
 from .views import (
     SessionListCreateView, SessionDetailView,
     UploadVideoView, SessionStatusView, SessionDeleteView,
-    AttendanceRecordToggleView,
+    AttendanceRecordToggleView,AttendanceExcelReportView,
 )
 
 urlpatterns = [
@@ -12,4 +13,5 @@ urlpatterns = [
     path('sessions/<int:session_id>/status/', SessionStatusView.as_view(), name='session-status'),
     path('sessions/<int:session_id>/delete/', SessionDeleteView.as_view(), name='session-delete'),
     path('records/<int:record_id>/toggle/', AttendanceRecordToggleView.as_view(), name='record-toggle'),
+    path('attendance/excel/', AttendanceExcelReportView.as_view(), name='attendance-excel'),
 ]

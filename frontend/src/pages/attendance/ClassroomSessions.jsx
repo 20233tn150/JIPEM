@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ChevronLeft, Plus, ClipboardList, Upload, ArrowRight, Search, X, Trash2 } from 'lucide-react'
+import { FileSpreadsheet, ChevronLeft, Plus, ClipboardList, Upload, ArrowRight, Search, X, Trash2, RefreshCw } from 'lucide-react'
 import api from '../../api/axios'
+import { useAuth } from '../../context/AuthContext'
 import PageHeader from '../../components/PageHeader'
 import StatusBadge from '../../components/StatusBadge'
 import ConfirmDialog from '../../components/ConfirmDialog'
 
 export default function ClassroomSessions() {
   const { classroomId } = useParams()
+  const { user } = useAuth()
   const [sessions, setSessions] = useState([])
   const [classroomName, setClassroomName] = useState('')
   const [loading, setLoading] = useState(true)
@@ -16,7 +18,9 @@ export default function ClassroomSessions() {
   const [uploadError, setUploadError] = useState('')
   const [search, setSearch] = useState('')
   const [deletingId, setDeletingId] = useState(null)
-  const [confirm, setConfirm] = useState(null) // { session }
+  const [confirm, setConfirm] = useState(null)
+  const [excelLoading, setExcelLoading] = useState(false)
+
 
   useEffect(() => {
     fetchSessions()
@@ -80,11 +84,40 @@ export default function ClassroomSessions() {
     }
   }
 
+  const downloadExcel = async () => {
+    setExcelLoading(true)
+    try {
+      const res = await api.get(`/attendance/attendance/excel/`, {
+        params: { classroom_id: classroomId },
+        responseType: 'blob',
+      })
+
+      const url = window.URL.createObjectURL(new Blob([res.data]))
+      const link = document.createElement('a')
+      link.href = url
+
+      const fileName = classroomName ? classroomName.replace(/\s+/g, '_') : classroomId
+      link.setAttribute('download', `Asistencia_${fileName}.xlsx`)
+
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error("Error al descargar Excel", err)
+      alert("Error al generar el Excel. Verifica que el grupo tenga sesiones completadas.")
+    } finally {
+      setExcelLoading(false)
+    }
+  }
+
   const q = search.toLowerCase()
   const visible = sessions.filter(s =>
     s.date.includes(q) ||
     (s.status || '').toLowerCase().includes(q)
   )
+
+  console.log("Estado de auth:", { user });
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -98,12 +131,30 @@ export default function ClassroomSessions() {
         title={classroomName || `Grupo ${classroomId}`}
         subtitle="Sesiones de asistencia ordenadas por fecha"
         action={
-          <Link
-            to={`/attendance/new?classroom=${classroomId}`}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm"
-          >
-            <Plus size={15} /> Nueva Sesión
-          </Link>
+          <div className="flex gap-2">
+            {user?.role === 'admin' && (
+              <button
+                onClick={downloadExcel}
+                disabled={excelLoading}
+                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow font-semibold transition-colors flex items-center gap-2 text-sm disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {excelLoading ? (
+                  <RefreshCw size={15} className="animate-spin" />
+                ) : (
+                  <FileSpreadsheet size={15} />
+                )}
+                {excelLoading ? 'Generando...' : 'Descargar Reporte Excel'}
+              </button>
+
+            )}
+
+            <Link
+              to={`/attendance/new?classroom=${classroomId}`}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow font-semibold transition-colors flex items-center gap-2 text-sm"
+            >
+              <Plus size={15} /> Nueva Sesión
+            </Link>
+          </div>
         }
       />
 

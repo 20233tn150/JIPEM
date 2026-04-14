@@ -1,3 +1,8 @@
+# backend > apps > attendance > views.py
+import openpyxl 
+from openpyxl.styles import Font, Alignment, PatternFill 
+from django.http import HttpResponse
+from apps.users.permissions import IsAdmin
 import os
 import uuid
 
@@ -14,6 +19,9 @@ from .serializers import (
     AttendanceSessionListSerializer,
 )
 from .tasks import start_attendance_processing
+
+from .models import AttendanceSession, AttendanceRecord
+from apps.classrooms.models import Classroom
 
 
 ALLOWED_EXTENSIONS = {'.mp4', '.avi', '.mov', '.mkv'}
@@ -176,3 +184,70 @@ class AttendanceRecordToggleView(APIView):
             'id': record.id,
             'is_present': record.is_present,
         })
+
+class AttendanceExcelReportView(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+
+        from openpyxl.utils import get_column_letter 
+        classroom_id = request.query_params.get('classroom_id')
+        
+        classroom = get_object_or_404(Classroom, pk=classroom_id)
+        
+        sessions = AttendanceSession.objects.filter(
+            classroom=classroom, 
+            status='completed'
+        ).order_by('date')
+        
+        students = classroom.students.all().order_by('name')
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Control de Asistencia"
+        ws.merge_cells('A1:B1')
+        ws['A1'] = f"GRUPO: {classroom.name}"
+        ws['A1'].font = Font(bold=True, size=12)
+        ws.append([]) 
+
+        headers = ['Matrícula', 'Nombre del Alumno']
+        for session in sessions:
+            headers.append(session.date.strftime('%d/%m/%Y') if session.date else "S/F")
+        ws.append(headers)
+        
+        header_row_idx = ws.max_row
+        for cell in ws[header_row_idx]:
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill(start_color="4F46E5", end_color="4F46E5", fill_type="solid")
+            cell.alignment = Alignment(horizontal="center")
+
+        for student in students:
+            row = [student.matricula, student.name]
+            for session in sessions:
+                record = AttendanceRecord.objects.filter(session=session, student=student).first()
+                row.append("P" if (record and record.is_present) else "A")
+            ws.append(row)
+
+        for i, col in enumerate(ws.columns, 1):
+            column_letter = get_column_letter(i)
+            max_length = 0
+            for cell in col:
+                try:
+                    if cell.value:
+                        val_str = str(cell.value)
+                        if len(val_str) > max_length:
+                            max_length = len(val_str)
+                except AttributeError:
+                    continue
+            
+            ws.column_dimensions[column_letter].width = max_length + 3
+
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+
+        clean_name = str(classroom.name).replace(" ", "_")
+        response['Content-Disposition'] = f'attachment; filename="Asistencia_{clean_name}.xlsx"'
+        
+        wb.save(response)
+        return response
