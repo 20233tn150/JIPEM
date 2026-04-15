@@ -46,14 +46,53 @@ export default function StudentForm() {
     }
   }
 
+  const validateStudentForm = () => {
+    if (!form.name.trim() || form.name.trim().length < 2) {
+      return 'El nombre del alumno debe tener al menos 2 caracteres.'
+    }
+    if (form.name.trim().length > 200) {
+      return 'El nombre no puede exceder 200 caracteres.'
+    }
+    if (!form.matricula.trim() || form.matricula.trim().length < 3) {
+      return 'La matrícula debe tener al menos 3 caracteres.'
+    }
+    if (form.matricula.trim().length > 20) {
+      return 'La matrícula no puede exceder 20 caracteres.'
+    }
+    if (form.age !== '' && form.age !== null) {
+      const age = Number.parseInt(form.age)
+      if (Number.isNaN(age) || age < 1 || age > 99) {
+        return 'La edad debe ser un número entre 1 y 99.'
+      }
+    }
+    return null
+  }
+
+  const FIELD_LABELS = {
+    name: 'Nombre',
+    matricula: 'Matrícula',
+    age: 'Edad',
+    sex: 'Sexo',
+    wears_glasses: 'Lentes',
+    non_field_errors: '',
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
-    setLoading(true)
 
+    const validationError = validateStudentForm()
+    if (validationError) {
+      setError(validationError)
+      return
+    }
+
+    setLoading(true)
     const payload = {
       ...form,
-      age: form.age ? parseInt(form.age) : null,
+      name: form.name.trim(),
+      matricula: form.matricula.trim(),
+      age: form.age === '' ? null : Number.parseInt(form.age),
     }
 
     try {
@@ -66,12 +105,14 @@ export default function StudentForm() {
     } catch (err) {
       const data = err.response?.data
       if (data) {
-        const messages = Object.entries(data)
-          .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
-          .join(' | ')
-        setError(messages)
+        const messages = Object.entries(data).flatMap(([field, errors]) => {
+          const label = FIELD_LABELS[field] ?? field
+          const msgs = Array.isArray(errors) ? errors : [errors]
+          return label ? msgs.map(m => `${label}: ${m}`) : msgs
+        })
+        setError(messages[0] || 'No se pudo guardar el alumno. Verifica los datos.')
       } else {
-        setError('Error al guardar alumno.')
+        setError('No se pudo conectar con el servidor. Intenta de nuevo.')
       }
     } finally {
       setLoading(false)
@@ -118,10 +159,11 @@ export default function StudentForm() {
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="student-name" className="block text-sm font-medium text-gray-700 mb-1">
               Nombre completo <span className="text-red-500">*</span>
             </label>
             <input
+              id="student-name"
               type="text"
               value={form.name}
               onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))}
@@ -132,10 +174,11 @@ export default function StudentForm() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="student-matricula" className="block text-sm font-medium text-gray-700 mb-1">
               Matrícula <span className="text-red-500">*</span>
             </label>
             <input
+              id="student-matricula"
               type="text"
               value={form.matricula}
               onChange={(e) => setForm(f => ({ ...f, matricula: e.target.value }))}
@@ -147,8 +190,9 @@ export default function StudentForm() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Edad</label>
+              <label htmlFor="student-age" className="block text-sm font-medium text-gray-700 mb-1">Edad</label>
               <input
+                id="student-age"
                 type="number"
                 value={form.age}
                 onChange={(e) => setForm(f => ({ ...f, age: e.target.value }))}
@@ -159,8 +203,9 @@ export default function StudentForm() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Sexo</label>
+              <label htmlFor="student-sex" className="block text-sm font-medium text-gray-700 mb-1">Sexo</label>
               <select
+                id="student-sex"
                 value={form.sex}
                 onChange={(e) => setForm(f => ({ ...f, sex: e.target.value }))}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
@@ -181,7 +226,7 @@ export default function StudentForm() {
               className="w-5 h-5 text-blue-600 rounded"
             />
             <label htmlFor="wears_glasses" className="text-sm font-medium text-gray-700 cursor-pointer">
-              Usa lentes
+              Usa lentes{' '}
               <span className="text-gray-400 font-normal ml-1">(importante para el reconocimiento facial)</span>
             </label>
           </div>
@@ -194,13 +239,21 @@ export default function StudentForm() {
             >
               Cancelar
             </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-lg transition-colors"
-            >
-              {loading ? 'Guardando...' : isEdit ? 'Actualizar Alumno' : 'Crear Alumno'}
-            </button>
+            {(() => {
+              let btnLabel
+              if (loading) { btnLabel = 'Guardando...' }
+              else if (isEdit) { btnLabel = 'Actualizar Alumno' }
+              else { btnLabel = 'Crear Alumno' }
+              return (
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-lg transition-colors"
+                >
+                  {btnLabel}
+                </button>
+              )
+            })()}
           </div>
         </form>
       </div>

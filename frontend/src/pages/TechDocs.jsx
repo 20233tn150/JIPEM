@@ -6,7 +6,7 @@
 import { useState } from 'react'
 import {
   ChevronDown, ChevronRight, Code2, Database, Cpu, Globe, Lock,
-  Camera, Eye, Video, Layers, Package, GitBranch, Terminal,
+  Camera, Eye, Video, Layers, GitBranch, Terminal,
 } from 'lucide-react'
 
 // ─── Primitivos de diseño ──────────────────────────────────────────────────
@@ -39,7 +39,7 @@ function CodeBlock({ children, lang = '' }) {
   )
 }
 
-function KV({ k, v, mono = false }) {
+function Kv({ k, v, mono = false }) {
   return (
     <div className="flex items-start gap-3 py-1.5 border-b border-gray-50 last:border-0">
       <span className="text-xs font-mono text-gray-400 w-52 shrink-0">{k}</span>
@@ -62,10 +62,10 @@ function Table({ headers, rows }) {
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
-          {rows.map((row, i) => (
-            <tr key={i} className="hover:bg-gray-50">
-              {row.map((cell, j) => (
-                <td key={j} className={`px-4 py-2.5 text-gray-700 ${j === 0 ? 'font-mono text-xs' : ''}`}>
+          {rows.map((row) => (
+            <tr key={row[0]} className="hover:bg-gray-50">
+              {row.map((cell) => (
+                <td key={cell} className={`px-4 py-2.5 text-gray-700 ${row.indexOf(cell) === 0 ? 'font-mono text-xs' : ''}`}>
                   {cell}
                 </td>
               ))}
@@ -179,11 +179,11 @@ export default function TechDocs() {
             Se usa <strong>JSON Web Tokens (JWT)</strong> con una estrategia de dos tokens para balancear seguridad y experiencia de usuario.
           </p>
           <div className="space-y-1 mb-4">
-            <KV k="access token lifetime" v="15 minutos — viaja en cada request como Bearer header" />
-            <KV k="refresh token lifetime" v="1 día — almacenado en sessionStorage del navegador" />
-            <KV k="algoritmo de firma" v="HS256 (HMAC-SHA256)" mono />
-            <KV k="rotación de tokens" v="ROTATE_REFRESH_TOKENS = True — cada refresh emite un nuevo par" />
-            <KV k="blacklist" v="BLACKLIST_AFTER_ROTATION = True — tokens usados quedan revocados" />
+            <Kv k="access token lifetime" v="15 minutos — viaja en cada request como Bearer header" />
+            <Kv k="refresh token lifetime" v="1 día — almacenado en sessionStorage del navegador" />
+            <Kv k="algoritmo de firma" v="HS256 (HMAC-SHA256)" mono />
+            <Kv k="rotación de tokens" v="ROTATE_REFRESH_TOKENS = True — cada refresh emite un nuevo par" />
+            <Kv k="blacklist" v="BLACKLIST_AFTER_ROTATION = True — tokens usados quedan revocados" />
           </div>
           <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Flujo en el frontend (axios.js)</p>
           <CodeBlock lang="JavaScript — interceptor de respuesta">
@@ -289,10 +289,10 @@ FaceEncoding.objects.create(
 
           <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Constantes del algoritmo</p>
           <div className="space-y-1 mb-4">
-            <KV k="FRAMES_TO_SKIP" v="5 — solo se procesa 1 de cada 5 fotogramas (optimización de velocidad)" mono />
-            <KV k="FACE_SIZE" v="(128, 128) — tamaño estándar del recorte facial" mono />
-            <KV k="LBPH_CONFIDENCE_THRESHOLD" v="100 — confianza máxima para aceptar un match (menor = más similar)" mono />
-            <KV k="PRESENCE_THRESHOLD_PCT" v="0.10 — el alumno debe aparecer en ≥10% de los fotogramas procesados" mono />
+            <Kv k="FRAMES_TO_SKIP" v="5 — solo se procesa 1 de cada 5 fotogramas (optimización de velocidad)" mono />
+            <Kv k="FACE_SIZE" v="(128, 128) — tamaño estándar del recorte facial" mono />
+            <Kv k="LBPH_CONFIDENCE_THRESHOLD" v="100 — confianza máxima para aceptar un match (menor = más similar)" mono />
+            <Kv k="PRESENCE_THRESHOLD_PCT" v="0.10 — el alumno debe aparecer en ≥10% de los fotogramas procesados" mono />
           </div>
 
           <Step
@@ -363,11 +363,11 @@ is_present = presence_map.get(student.id, 0.0) >= 0.10`}
 
           <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Constantes del algoritmo</p>
           <div className="space-y-1 mb-4">
-            <KV k="FRAMES_TO_SKIP" v="5 — procesa 1 de cada 5 fotogramas" mono />
-            <KV k="EYE_CLOSED_CONSEC_SECS" v="0.5 segundos — tiempo mínimo de cierre para contar episodio" mono />
-            <KV k="eye_closed_frames" v="max(1, int(0.5 × fps / 5)) — con 25fps resultan ~2-3 frames" mono />
-            <KV k="PRESENCE_THRESHOLD_PCT" v="0.10 — cara debe aparecer ≥10% del video" mono />
-            <KV k="LBPH_CONFIDENCE_THRESHOLD" v="100 — umbral para identificar al alumno correcto" mono />
+            <Kv k="FRAMES_TO_SKIP" v="5 — procesa 1 de cada 5 fotogramas" mono />
+            <Kv k="EYE_CLOSED_CONSEC_SECS" v="0.5 segundos — tiempo mínimo de cierre para contar episodio" mono />
+            <Kv k="eye_closed_frames" v="max(1, int(0.5 × fps / 5)) — con 25fps resultan ~2-3 frames" mono />
+            <Kv k="PRESENCE_THRESHOLD_PCT" v="0.10 — cara debe aparecer ≥10% del video" mono />
+            <Kv k="LBPH_CONFIDENCE_THRESHOLD" v="100 — umbral para identificar al alumno correcto" mono />
           </div>
 
           <Step
@@ -434,9 +434,9 @@ else:                 return 'fatigado'   # PERCLOS > 0.30`}
           />
 
           <div className="bg-purple-50 border border-purple-200 rounded-lg px-4 py-3 mt-4 text-sm text-purple-900">
-            <strong>¿Por qué PERCLOS y no detección de bostezos?</strong> El método anterior usaba
+            <strong>¿Por qué PERCLOS y no detección de bostezos?</strong> El método anterior usaba{' '}
             <code className="bg-purple-100 px-1 rounded text-xs mx-1">haarcascade_smile</code>
-            para detectar bostezos, pero contaba cualquier apertura de boca (hablar, toser, sonreír).
+            {' '}para detectar bostezos, pero contaba cualquier apertura de boca (hablar, toser, sonreír).
             PERCLOS está validado científicamente como el indicador más robusto de somnolencia porque
             el cierre de ojos es involuntario y directamente correlacionado con el estado de alerta.
           </div>
@@ -670,8 +670,8 @@ else:                 return 'fatigado'   # PERCLOS > 0.30`}
               q: '¿Qué significa confidence en LBPH?',
               a: 'En LBPH el confidence NO es una probabilidad (0-100%). Es una distancia de histograma — cuanto menor, más similar. Un confidence de 0 sería imagen idéntica. El umbral de 100 es empírico: valores menores indican que la cara es suficientemente similar al entrenamiento como para ser el mismo alumno.',
             },
-          ].map(({ q, a }, i) => (
-            <div key={i} className="mt-4 border-b pb-4 last:border-0">
+          ].map(({ q, a }) => (
+            <div key={q} className="mt-4 border-b pb-4 last:border-0">
               <p className="text-sm font-semibold text-gray-800">❓ {q}</p>
               <p className="text-sm text-gray-600 mt-1.5">{a}</p>
             </div>

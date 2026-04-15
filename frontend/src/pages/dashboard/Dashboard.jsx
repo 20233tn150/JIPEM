@@ -46,7 +46,7 @@ export default function Dashboard() {
     </div>
   );
 
-  if (!data || !data.kpis) return <div className="p-10 text-center text-red-500">Error al cargar datos.</div>;
+  if (!data?.kpis) return <div className="p-10 text-center text-red-500">Error al cargar datos.</div>;
 
   const { kpis, chart_data } = data;
 

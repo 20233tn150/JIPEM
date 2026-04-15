@@ -135,13 +135,18 @@ export default function ClassroomDetail() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {students.map(student => (
+                {students.map(student => {
+                  let sexLabel
+                  if (student.sex === 'M') { sexLabel = 'Masculino' }
+                  else if (student.sex === 'F') { sexLabel = 'Femenino' }
+                  else { sexLabel = '—' }
+                  return (
                   <tr key={student.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 font-medium text-gray-900">{student.name}</td>
                     <td className="px-6 py-4 font-mono text-gray-600 text-xs">{student.matricula}</td>
                     <td className="px-6 py-4 text-gray-600">{student.age || '—'}</td>
                     <td className="px-6 py-4 text-gray-600">
-                      {student.sex === 'M' ? 'Masculino' : student.sex === 'F' ? 'Femenino' : '—'}
+                      {sexLabel}
                     </td>
                     <td className="px-6 py-4">
                       {student.face_sample_count > 0 ? (
@@ -185,7 +190,8 @@ export default function ClassroomDetail() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>

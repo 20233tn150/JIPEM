@@ -159,8 +159,8 @@ export default function HowItWorks() {
               'No analiza expresiones faciales, emociones ni lenguaje corporal.',
               'No comparte datos con terceros ni servicios externos.',
               'No toma decisiones automáticas — toda acción requiere la revisión del maestro.',
-            ].map((item, i) => (
-              <li key={i} className="flex gap-2">
+            ].map((item) => (
+              <li key={item.slice(0, 30)} className="flex gap-2">
                 <CheckCircle size={14} className="text-gray-400 shrink-0 mt-0.5" />
                 <span>{item}</span>
               </li>

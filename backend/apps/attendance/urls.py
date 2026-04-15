@@ -2,16 +2,18 @@
 from django.urls import path
 from .views import (
     SessionListCreateView, SessionDetailView,
-    UploadVideoView, SessionStatusView, SessionDeleteView,
-    AttendanceRecordToggleView,AttendanceExcelReportView,
+    UploadVideoView, SessionStatusView,
+    AttendanceRecordToggleView, AttendanceExcelReportView,
 )
 
 urlpatterns = [
+    # GET → lista  |  POST → crea sesión
     path('sessions/', SessionListCreateView.as_view(), name='session-list'),
+    # GET → detalle  |  DELETE → elimina sesión
     path('sessions/<int:pk>/', SessionDetailView.as_view(), name='session-detail'),
     path('sessions/<int:session_id>/upload-video/', UploadVideoView.as_view(), name='upload-video'),
     path('sessions/<int:session_id>/status/', SessionStatusView.as_view(), name='session-status'),
-    path('sessions/<int:session_id>/delete/', SessionDeleteView.as_view(), name='session-delete'),
-    path('records/<int:record_id>/toggle/', AttendanceRecordToggleView.as_view(), name='record-toggle'),
+    # PATCH → alterna presencia/ausencia del registro
+    path('records/<int:record_id>/', AttendanceRecordToggleView.as_view(), name='record-detail'),
     path('attendance/excel/', AttendanceExcelReportView.as_view(), name='attendance-excel'),
 ]

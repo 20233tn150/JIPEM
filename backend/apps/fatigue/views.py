@@ -1,6 +1,5 @@
 import os
 import uuid
-import logging
 
 from django.conf import settings
 from django.shortcuts import get_object_or_404
@@ -13,14 +12,16 @@ from .models import IndividualFatigueAnalysis
 from .serializers import IndividualFatigueAnalysisSerializer
 from .tasks import start_individual_fatigue_processing
 
-logger = logging.getLogger(__name__)
-
 ALLOWED_EXTENSIONS = {'.mp4', '.avi', '.mov', '.mkv'}
 MAX_UPLOAD_SIZE = getattr(settings, 'MAX_UPLOAD_SIZE', 500 * 1024 * 1024)
 
 
 class IndividualFatigueListView(generics.ListAPIView):
-    """Lista todos los análisis individuales del maestro autenticado."""
+    """
+    GET  individual/  — lista los análisis del maestro autenticado.
+    POST individual/  — recibe student_id, date y video (multipart), crea el
+                        análisis y lanza el procesamiento en un hilo daemon.
+    """
     serializer_class = IndividualFatigueAnalysisSerializer
     permission_classes = [IsAuthenticated]
 
@@ -38,24 +39,15 @@ class IndividualFatigueListView(generics.ListAPIView):
             qs = qs.filter(student__classroom_id=classroom_id)
         return qs.order_by('-date', '-created_at')
 
-
-class IndividualFatigueCreateView(APIView):
-    """
-    Recibe student_id, date y video (multipart).
-    Guarda el video en /tmp, crea IndividualFatigueAnalysis y lanza
-    el procesamiento en un hilo daemon.
-    """
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
+    def post(self, request, *args, **kwargs):
         student_id = request.data.get('student_id')
         date = request.data.get('date')
         video_file = request.FILES.get('video')
 
         if not student_id:
-            return Response({'error': 'Se requiere student_id.'}, status=400)
+            return Response({'error': 'Se requiere el identificador del alumno.'}, status=400)
         if not date:
-            return Response({'error': 'Se requiere date (YYYY-MM-DD).'}, status=400)
+            return Response({'error': 'Se requiere la fecha del análisis (YYYY-MM-DD).'}, status=400)
         if not video_file:
             return Response({'error': 'Se requiere el archivo de video.'}, status=400)
 
@@ -68,11 +60,11 @@ class IndividualFatigueCreateView(APIView):
         ext = os.path.splitext(video_file.name)[1].lower()
         if ext not in ALLOWED_EXTENSIONS:
             return Response(
-                {'error': f'Formato no permitido. Use: {", ".join(ALLOWED_EXTENSIONS)}'},
+                {'error': f'Formato de video no permitido. Formatos aceptados: {", ".join(ALLOWED_EXTENSIONS)}.'},
                 status=400,
             )
         if video_file.size > MAX_UPLOAD_SIZE:
-            return Response({'error': 'El video supera el límite de 500MB.'}, status=400)
+            return Response({'error': 'El video supera el límite permitido de 500 MB.'}, status=400)
 
         tmp_dir = settings.MEDIA_ROOT / 'tmp'
         tmp_dir.mkdir(parents=True, exist_ok=True)

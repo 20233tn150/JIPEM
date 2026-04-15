@@ -20,7 +20,6 @@ import HowItWorks from './pages/HowItWorks'
 import TermsAndConditions from './pages/TermsAndConditions'
 import TechDocs from './pages/TechDocs'
 import Layout from './components/Layout'
-import Dashboard from './pages/dashboard/Dashboard'
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
@@ -44,8 +43,7 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
-            <Route index element={<Navigate to="/dashboard" replace />} />
-            <Route path="dashboard" element={<Dashboard />} />
+            <Route index element={<Navigate to="/classrooms" replace />} />
             <Route path="admin/maestros" element={<AdminRoute><MaestrosAdmin /></AdminRoute>} />
             <Route path="classrooms" element={<ClassroomList />} />
             <Route path="classrooms/:id" element={<ClassroomDetail />} />

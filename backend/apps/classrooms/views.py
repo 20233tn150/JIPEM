@@ -13,9 +13,9 @@ from rest_framework.views import APIView
 
 from .models import Classroom, Student, FaceEncoding
 from .serializers import ClassroomSerializer, StudentSerializer, FaceStatusSerializer
+from .crypto import EncryptedJSONParser, EncryptedJSONRenderer
 
-import logging
-logger = logging.getLogger(__name__)
+from loguru import logger
 
 # ── InsightFace singleton ────────────────────────────────────────────────────
 _face_app = None
@@ -44,6 +44,8 @@ def _get_face_app():
 class ClassroomListCreateView(generics.ListCreateAPIView):
     serializer_class = ClassroomSerializer
     permission_classes = [IsAuthenticated]
+    parser_classes = [EncryptedJSONParser]
+    renderer_classes = [EncryptedJSONRenderer]
 
     def get_queryset(self):
         qs = Classroom.objects.filter(is_active=True)
@@ -58,6 +60,8 @@ class ClassroomListCreateView(generics.ListCreateAPIView):
 class ClassroomDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ClassroomSerializer
     permission_classes = [IsAuthenticated]
+    parser_classes = [EncryptedJSONParser]
+    renderer_classes = [EncryptedJSONRenderer]
 
     def get_queryset(self):
         qs = Classroom.objects.filter(is_active=True)
@@ -158,7 +162,7 @@ class CaptureFaceView(APIView):
         FaceEncoding.objects.create(student=student, encoding_data=buf.getvalue())
 
         count = student.face_encodings.count()
-        logger.info(f"Face sample saved for student {student.id} (total: {count}).")
+        logger.info("Face sample saved for student {} (total: {}).", student.id, count)
         return Response({
             'message': 'Muestra facial guardada correctamente.',
             'sample_count': count,

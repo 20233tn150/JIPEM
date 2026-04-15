@@ -66,6 +66,12 @@ export default function FatigueList() {
     return matchGroup && matchSearch
   })
 
+  let listContent
+  if (loading) { listContent = 'loading' }
+  else if (analyses.length === 0) { listContent = 'empty' }
+  else if (filtered.length === 0) { listContent = 'no-results' }
+  else { listContent = 'table' }
+
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <PageHeader
@@ -124,7 +130,7 @@ export default function FatigueList() {
         </div>
       )}
 
-      {loading ? (
+      {listContent === 'loading' && (
         <div className="bg-white rounded-xl border overflow-hidden">
           <div className="divide-y">
             {[1, 2, 3, 4].map(i => (
@@ -139,7 +145,8 @@ export default function FatigueList() {
             ))}
           </div>
         </div>
-      ) : analyses.length === 0 ? (
+      )}
+      {listContent === 'empty' && (
         <div className="bg-white rounded-xl border p-12 text-center">
           <BrainCircuit size={40} className="mx-auto mb-4 text-gray-300" />
           <p className="text-lg font-medium text-gray-600 mb-1">Sin análisis registrados</p>
@@ -151,7 +158,8 @@ export default function FatigueList() {
             <Plus size={14} /> Nuevo Análisis
           </Link>
         </div>
-      ) : filtered.length === 0 ? (
+      )}
+      {listContent === 'no-results' && (
         <div className="bg-white rounded-xl border p-10 text-center text-gray-400">
           <Search size={28} className="mx-auto mb-3 opacity-30" />
           <p className="text-sm">Sin resultados para los filtros aplicados</p>
@@ -162,7 +170,8 @@ export default function FatigueList() {
             Limpiar filtros
           </button>
         </div>
-      ) : (
+      )}
+      {listContent === 'table' && (
         <div className="bg-white rounded-xl border overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -181,7 +190,15 @@ export default function FatigueList() {
                 {filtered.map(a => {
                   const labelStyle = LABEL_STYLE[a.result_label] || {}
                   const attPct = Math.round(a.attention_score)
-                  const attColor = attPct >= 70 ? 'bg-green-500' : attPct >= 40 ? 'bg-amber-500' : 'bg-red-500'
+                  let attColor
+                  if (attPct >= 70) { attColor = 'bg-green-500' }
+                  else if (attPct >= 40) { attColor = 'bg-amber-500' }
+                  else { attColor = 'bg-red-500' }
+
+                  let attTextColor
+                  if (attPct >= 70) { attTextColor = 'text-green-600' }
+                  else if (attPct >= 40) { attTextColor = 'text-amber-600' }
+                  else { attTextColor = 'text-red-600' }
                   return (
                     <tr key={a.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4">
@@ -208,7 +225,7 @@ export default function FatigueList() {
                       <td className="px-6 py-4 min-w-28">
                         {a.status === 'completed' && a.result_label ? (
                           <div className="flex items-center gap-2">
-                            <span className={`text-xs font-semibold w-8 text-right ${attPct >= 70 ? 'text-green-600' : attPct >= 40 ? 'text-amber-600' : 'text-red-600'}`}>
+                            <span className={`text-xs font-semibold w-8 text-right ${attTextColor}`}>
                               {attPct}%
                             </span>
                             <div className="flex-1 bg-gray-100 rounded-full h-1.5">

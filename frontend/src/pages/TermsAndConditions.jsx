@@ -1,4 +1,4 @@
-import { Shield, Lock, UserCheck, FileText, AlertTriangle, Mail } from 'lucide-react'
+import { Shield, Mail } from 'lucide-react'
 import PageHeader from '../components/PageHeader'
 
 function Article({ number, title, children }) {
@@ -58,8 +58,8 @@ export default function TermsAndConditions() {
               'Registro automático de asistencia a clases mediante análisis de video.',
               'Análisis individual de atención y fatiga durante sesiones académicas.',
               'Generación de reportes de seguimiento para uso exclusivo del docente.',
-            ].map((item, i) => (
-              <li key={i} className="flex gap-2">
+            ].map((item) => (
+              <li key={item} className="flex gap-2">
                 <span className="text-blue-500 shrink-0">·</span>
                 <span>{item}</span>
               </li>
@@ -81,8 +81,8 @@ export default function TermsAndConditions() {
               'Nombre completo y matrícula (datos de identificación institucional).',
               'Representaciones matemáticas del rostro (embeddings faciales), no fotografías directas.',
               'Resultados de análisis de atención asociados a fechas y sesiones específicas.',
-            ].map((item, i) => (
-              <li key={i} className="flex gap-2">
+            ].map((item) => (
+              <li key={item} className="flex gap-2">
                 <span className="text-blue-500 shrink-0">·</span>
                 <span>{item}</span>
               </li>
@@ -110,8 +110,8 @@ export default function TermsAndConditions() {
               'Quién tiene acceso a los resultados del análisis.',
               'El derecho a solicitar la eliminación de sus datos en cualquier momento.',
               'Que la participación en los análisis no afecta calificaciones ni evaluaciones formales.',
-            ].map((item, i) => (
-              <li key={i} className="flex gap-2">
+            ].map((item) => (
+              <li key={item} className="flex gap-2">
                 <span className="text-blue-500 shrink-0">·</span>
                 <span>{item}</span>
               </li>
@@ -158,8 +158,8 @@ export default function TermsAndConditions() {
               'Solicitar la rectificación de datos incorrectos o desactualizados.',
               'Solicitar la eliminación de sus muestras faciales y registros del sistema.',
               'Oponerse al tratamiento de sus datos biométricos en cualquier momento.',
-            ].map((item, i) => (
-              <li key={i} className="flex gap-2">
+            ].map((item) => (
+              <li key={item} className="flex gap-2">
                 <span className="text-blue-500 shrink-0">·</span>
                 <span>{item}</span>
               </li>

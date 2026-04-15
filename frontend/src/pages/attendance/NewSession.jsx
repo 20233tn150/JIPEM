@@ -88,46 +88,7 @@ export default function NewSession() {
     <div className="p-6 max-w-xl mx-auto">
       <PageHeader title="Nueva Sesión de Asistencia" />
       <div className="bg-white rounded-xl border p-6 space-y-6">
-        {!session ? (
-          <form onSubmit={createSession} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Grupo</label>
-              <SearchableSelect
-                value={form.classroom}
-                onChange={val => setForm(f => ({ ...f, classroom: val }))}
-                options={classroomOptions}
-                placeholder="Seleccionar grupo..."
-              />
-              {/* Hidden native input so required validation works */}
-              <input
-                type="text"
-                value={form.classroom}
-                onChange={() => {}}
-                required
-                className="sr-only"
-                tabIndex={-1}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Fecha</label>
-              <input
-                type="date"
-                value={form.date}
-                onChange={(e) => setForm(f => ({ ...f, date: e.target.value }))}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                required
-              />
-            </div>
-            {error && <p className="text-red-600 text-sm">{error}</p>}
-            <button
-              type="submit"
-              disabled={loading || !form.classroom}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-lg transition-colors text-sm"
-            >
-              {loading ? 'Creando...' : 'Crear Sesión'}
-            </button>
-          </form>
-        ) : (
+        {session ? (
           <div className="space-y-4">
             <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3">
               <CheckCircle size={18} className="text-green-600 shrink-0" />
@@ -148,8 +109,9 @@ export default function NewSession() {
             ) : (
               <div className="space-y-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Video de clase</label>
+                  <label htmlFor="video-file" className="block text-sm font-medium text-gray-700 mb-1.5">Video de clase</label>
                   <input
+                    id="video-file"
                     type="file"
                     accept=".mp4,.avi,.mov,.mkv"
                     onChange={(e) => setVideoFile(e.target.files[0])}
@@ -169,6 +131,47 @@ export default function NewSession() {
               </div>
             )}
           </div>
+        ) : (
+          <form onSubmit={createSession} className="space-y-4">
+            <div>
+              <label htmlFor="classroom-select" className="block text-sm font-medium text-gray-700 mb-1.5">Grupo</label>
+              <SearchableSelect
+                value={form.classroom}
+                onChange={val => setForm(f => ({ ...f, classroom: val }))}
+                options={classroomOptions}
+                placeholder="Seleccionar grupo..."
+              />
+              {/* Hidden native input so required validation works */}
+              <input
+                id="classroom-select"
+                type="text"
+                value={form.classroom}
+                onChange={() => {}}
+                required
+                className="sr-only"
+                tabIndex={-1}
+              />
+            </div>
+            <div>
+              <label htmlFor="session-date" className="block text-sm font-medium text-gray-700 mb-1.5">Fecha</label>
+              <input
+                id="session-date"
+                type="date"
+                value={form.date}
+                onChange={(e) => setForm(f => ({ ...f, date: e.target.value }))}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                required
+              />
+            </div>
+            {error && <p className="text-red-600 text-sm">{error}</p>}
+            <button
+              type="submit"
+              disabled={loading || !form.classroom}
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-lg transition-colors text-sm"
+            >
+              {loading ? 'Creando...' : 'Crear Sesión'}
+            </button>
+          </form>
         )}
       </div>
     </div>

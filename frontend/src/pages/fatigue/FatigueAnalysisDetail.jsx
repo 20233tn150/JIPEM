@@ -62,7 +62,7 @@ export default function FatigueAnalysisDetail() {
     try {
       const res = await api.get(`/reports/fatigue/individual/?analysis_id=${id}`, { responseType: 'text' })
       const blob = new Blob([res.data], { type: 'text/html' })
-      window.open(URL.createObjectURL(blob), '_blank')
+      globalThis.open(URL.createObjectURL(blob), '_blank')
     } catch {
       // silently fail
     }
@@ -76,14 +76,14 @@ export default function FatigueAnalysisDetail() {
         responseType: 'blob'
       });
 
-      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const url = globalThis.URL.createObjectURL(new Blob([res.data]));
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', `Reporte_Fatiga_${analysis.student_name || id}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();
-      window.URL.revokeObjectURL(url);
+      globalThis.URL.revokeObjectURL(url);
     } catch (err) {
       console.error("Error al descargar PDF:", err);
       alert("No se pudo generar el archivo PDF.");
@@ -117,6 +117,36 @@ export default function FatigueAnalysisDetail() {
   const hasResults = analysis.status === 'completed' && analysis.result_label
   const attPct = Math.round(analysis.attention_score)
   const fatPct = Math.round(analysis.fatigue_score)
+
+  let attColorClass
+  if (attPct >= 70) { attColorClass = 'text-green-600' }
+  else if (attPct >= 40) { attColorClass = 'text-amber-600' }
+  else { attColorClass = 'text-red-600' }
+
+  let attBgClass
+  if (attPct >= 70) { attBgClass = 'bg-green-500' }
+  else if (attPct >= 40) { attBgClass = 'bg-amber-500' }
+  else { attBgClass = 'bg-red-500' }
+
+  let attLabel
+  if (attPct >= 70) { attLabel = 'Nivel alto de atención' }
+  else if (attPct >= 40) { attLabel = 'Atención moderada' }
+  else { attLabel = 'Nivel bajo de atención' }
+
+  let fatColorClass
+  if (fatPct >= 50) { fatColorClass = 'text-red-600' }
+  else if (fatPct >= 30) { fatColorClass = 'text-amber-600' }
+  else { fatColorClass = 'text-green-600' }
+
+  let fatBgClass
+  if (fatPct >= 50) { fatBgClass = 'bg-red-500' }
+  else if (fatPct >= 30) { fatBgClass = 'bg-amber-500' }
+  else { fatBgClass = 'bg-green-500' }
+
+  let fatLabel
+  if (fatPct >= 50) { fatLabel = 'Fatiga elevada' }
+  else if (fatPct >= 30) { fatLabel = 'Fatiga moderada' }
+  else { fatLabel = 'Fatiga baja' }
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
@@ -227,22 +257,22 @@ export default function FatigueAnalysisDetail() {
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Puntuación de Atención</p>
               <ScoreBar
                 score={analysis.attention_score}
-                colorClass={attPct >= 70 ? 'text-green-600' : attPct >= 40 ? 'text-amber-600' : 'text-red-600'}
-                bgClass={attPct >= 70 ? 'bg-green-500' : attPct >= 40 ? 'bg-amber-500' : 'bg-red-500'}
+                colorClass={attColorClass}
+                bgClass={attBgClass}
               />
-              <p className={`text-xs font-medium mt-2 ${attPct >= 70 ? 'text-green-600' : attPct >= 40 ? 'text-amber-600' : 'text-red-600'}`}>
-                {attPct >= 70 ? 'Nivel alto de atención' : attPct >= 40 ? 'Atención moderada' : 'Nivel bajo de atención'}
+              <p className={`text-xs font-medium mt-2 ${attColorClass}`}>
+                {attLabel}
               </p>
             </div>
             <div className="bg-white rounded-xl border p-5">
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Puntuación de Fatiga</p>
               <ScoreBar
                 score={analysis.fatigue_score}
-                colorClass={fatPct >= 50 ? 'text-red-600' : fatPct >= 30 ? 'text-amber-600' : 'text-green-600'}
-                bgClass={fatPct >= 50 ? 'bg-red-500' : fatPct >= 30 ? 'bg-amber-500' : 'bg-green-500'}
+                colorClass={fatColorClass}
+                bgClass={fatBgClass}
               />
-              <p className={`text-xs font-medium mt-2 ${fatPct >= 50 ? 'text-red-600' : fatPct >= 30 ? 'text-amber-600' : 'text-green-600'}`}>
-                {fatPct >= 50 ? 'Fatiga elevada' : fatPct >= 30 ? 'Fatiga moderada' : 'Fatiga baja'}
+              <p className={`text-xs font-medium mt-2 ${fatColorClass}`}>
+                {fatLabel}
               </p>
             </div>
           </div>
