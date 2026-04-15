@@ -1,11 +1,12 @@
 from django.db import models
-
+from django.conf import settings 
 
 class AuditLog(models.Model):
     EVENT_INSERT = 'insert'
     EVENT_UPDATE = 'update'
     EVENT_DELETE = 'delete'
     EVENT_LOGIN = 'login'
+    
     EVENT_CHOICES = [
         (EVENT_INSERT, 'Insert'),
         (EVENT_UPDATE, 'Update'),
@@ -13,7 +14,18 @@ class AuditLog(models.Model):
         (EVENT_LOGIN, 'Login'),
     ]
 
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='audit_logs'
+    )
+    
     mysql_user = models.CharField(max_length=100, blank=True)
+    
+    table_name = models.CharField(max_length=100, blank=True, null=True)
+    
     event_type = models.CharField(max_length=50, choices=EVENT_CHOICES)
     description = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
