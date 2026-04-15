@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, BookOpen, Trash2, ArrowRight, Search, X } from 'lucide-react'
+import { Plus, BookOpen, Trash2, ArrowRight, Search, X, Pencil } from 'lucide-react'
 import api from '../../api/axios'
 import PageHeader from '../../components/PageHeader'
 
@@ -16,6 +16,7 @@ export default function ClassroomList() {
   const [formError, setFormError] = useState('')
   const [formLoading, setFormLoading] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
+  const [editTarget, setEditTarget] = useState(null)
 
   const visibleClassrooms = classrooms.filter(c => {
     const q = search.toLowerCase()
@@ -40,13 +41,22 @@ export default function ClassroomList() {
   }
 
   const openCreate = () => {
+    setEditTarget(null)
     setForm(EMPTY_FORM)
+    setFormError('')
+    setShowModal(true)
+  }
+
+  const openEdit = (classroom) => {
+    setEditTarget(classroom)
+    setForm({ name: classroom.name, subject: classroom.subject })
     setFormError('')
     setShowModal(true)
   }
 
   const closeModal = () => {
     setShowModal(false)
+    setEditTarget(null)
     setForm(EMPTY_FORM)
     setFormError('')
   }
@@ -79,14 +89,18 @@ export default function ClassroomList() {
 
     setFormLoading(true)
     try {
-      await api.post('/classrooms/', { name: form.name.trim(), subject: form.subject.trim() })
+      if (editTarget) {
+        await api.put(`/classrooms/${editTarget.id}/`, { name: form.name.trim(), subject: form.subject.trim() })
+      } else {
+        await api.post('/classrooms/', { name: form.name.trim(), subject: form.subject.trim() })
+      }
       closeModal()
       fetchClassrooms()
     } catch (err) {
       const data = err.response?.data
       if (data) {
         const msgs = Object.values(data).flat()
-        setFormError(msgs[0] || 'No se pudo crear el grupo. Verifica los datos.')
+        setFormError(msgs[0] || `No se pudo ${editTarget ? 'editar' : 'crear'} el grupo. Verifica los datos.`)
       } else {
         setFormError('No se pudo conectar con el servidor. Intenta de nuevo.')
       }
@@ -134,6 +148,13 @@ export default function ClassroomList() {
             >
               Ver Grupo <ArrowRight size={13} />
             </Link>
+            <button
+              onClick={() => openEdit(classroom)}
+              className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors border border-blue-200"
+              title="Editar grupo"
+            >
+              <Pencil size={16} />
+            </button>
             <button
               onClick={() => setDeleteConfirm(classroom)}
               className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors border border-red-200"
@@ -219,7 +240,7 @@ export default function ClassroomList() {
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
-            <h2 className="text-lg font-bold text-gray-900 mb-5">Nuevo Grupo</h2>
+            <h2 className="text-lg font-bold text-gray-900 mb-5">{editTarget ? 'Editar Grupo' : 'Nuevo Grupo'}</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               {formError && (
                 <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
@@ -255,7 +276,7 @@ export default function ClassroomList() {
                   Cancelar
                 </button>
                 <button type="submit" disabled={formLoading} className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-lg transition-colors text-sm">
-                  {formLoading ? 'Creando...' : 'Crear Grupo'}
+                  {formLoading ? (editTarget ? 'Guardando...' : 'Creando...') : (editTarget ? 'Guardar Cambios' : 'Crear Grupo')}
                 </button>
               </div>
             </form>
