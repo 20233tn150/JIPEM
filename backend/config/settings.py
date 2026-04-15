@@ -93,7 +93,7 @@ AUTH_USER_MODEL = 'users.User'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'es'
 
 TIME_ZONE = 'America/Mexico_City'
 
@@ -146,31 +146,10 @@ SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_HTTPONLY = True
 
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-            'formatter': 'simple',
-        },
-    },
-    'formatters': {
-        'simple': {
-            'format': '[%(asctime)s] %(levelname)s %(name)s: %(message)s',
-            'datefmt': '%H:%M:%S',
-        },
-    },
-    'loggers': {
-        'apps.attendance': {
-            'handlers': ['console'],
-            'level': 'INFO',
-            'propagate': False,
-        },
-        'apps.classrooms': {
-            'handlers': ['console'],
-            'level': 'INFO',
-            'propagate': False,
-        },
-    },
-}
+LOGGING_CONFIG = None  # loguru se configura en manage.py / wsgi.py
+
+# AES-256-GCM key for classroom endpoint encryption (64 hex chars = 32 bytes)
+CLASSROOM_ENCRYPTION_KEY = config(
+    'CLASSROOM_ENCRYPTION_KEY',
+    default='a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2',
+)

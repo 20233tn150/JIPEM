@@ -106,9 +106,9 @@ export default function SearchableSelect({
               type="button"
               onClick={() => handleSelect('')}
               className={`w-full text-left px-4 py-2 text-sm ${
-                !value
-                  ? 'bg-blue-50 text-blue-600 font-medium'
-                  : 'text-gray-400 hover:bg-gray-50'
+                value
+                  ? 'text-gray-400 hover:bg-gray-50'
+                  : 'bg-blue-50 text-blue-600 font-medium'
               }`}
             >
               {placeholder}

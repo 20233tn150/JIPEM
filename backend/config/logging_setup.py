@@ -24,10 +24,17 @@ from loguru import logger
 _configured: bool = False
 
 CONSOLE_FORMAT = (
-    "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
+    "\n<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
     "<level>{level: <8}</level> | "
-    "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
-    "{message}"
+    "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan>\n"
+    "    <level>{message}</level>"
+)
+
+FILE_FORMAT = (
+    "\n{time:YYYY-MM-DD HH:mm:ss.SSS} | "
+    "{level: <8} | "
+    "{name}:{function}:{line}\n"
+    "    {message}"
 )
 
 
@@ -80,10 +87,10 @@ def setup_logging() -> None:
     logger.add(
         logs_dir / 'app.log',
         level='INFO',
+        format=FILE_FORMAT,
         rotation='10 MB',
         retention='7 days',
         compression='zip',
-        serialize=True,
         encoding='utf-8',
         filter=lambda record: not record['extra'].get('pipeline', False),
     )
@@ -92,10 +99,10 @@ def setup_logging() -> None:
     logger.add(
         logs_dir / 'cv_pipeline.log',
         level='DEBUG',
+        format=FILE_FORMAT,
         rotation='20 MB',
         retention='14 days',
         compression='zip',
-        serialize=True,
         encoding='utf-8',
         filter=lambda record: bool(record['extra'].get('pipeline', False)),
     )

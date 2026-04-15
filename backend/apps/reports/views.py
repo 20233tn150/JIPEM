@@ -6,7 +6,10 @@ from rest_framework.views import APIView
 
 from apps.attendance.models import AttendanceSession
 from apps.fatigue.models import FatigueSession, IndividualFatigueAnalysis
-from weasyprint import HTML
+try:
+    from weasyprint import HTML as _WeasyHTML
+except Exception:
+    _WeasyHTML = None  # GTK no disponible en este entorno; los endpoints PDF retornarán 503
 from rest_framework.renderers import StaticHTMLRenderer
 
 _HTML_CONTENT_TYPE = 'text/html; charset=utf-8'
@@ -72,8 +75,13 @@ class AttendancePDFView(APIView):
                 'total_count': records.count(),
             })
 
-            pdf = HTML(
-                string=html_string, 
+            if _WeasyHTML is None:
+                return HttpResponse(
+                    'La generación de PDF no está disponible en este entorno (GTK no instalado).',
+                    status=503, content_type='text/plain',
+                )
+            pdf = _WeasyHTML(
+                string=html_string,
                 base_url=request.build_absolute_uri('/')
             ).write_pdf()
 
@@ -153,8 +161,13 @@ class IndividualFatiguePDFView(APIView):
                 'student': analysis.student
             })
 
-            pdf = HTML(
-                string=html_string, 
+            if _WeasyHTML is None:
+                return HttpResponse(
+                    'La generación de PDF no está disponible en este entorno (GTK no instalado).',
+                    status=503, content_type='text/plain',
+                )
+            pdf = _WeasyHTML(
+                string=html_string,
                 base_url=request.build_absolute_uri('/')
             ).write_pdf()
 

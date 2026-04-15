@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { encryptPayload, decryptPayload, isClassroomUrl } from './classroomCrypto'
 
 const BASE_URL = import.meta.env.VITE_API_URL
 
@@ -39,6 +40,18 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
+// Request interceptor: encrypt classroom payloads
+api.interceptors.request.use(
+  async (config) => {
+    if (isClassroomUrl(config.url) && config.data && !config._encrypted) {
+      config.data = await encryptPayload(config.data)
+      config._encrypted = true
+    }
+    return config
+  },
+  (error) => Promise.reject(error),
+)
+
 // Request interceptor: attach access token
 api.interceptors.request.use(
   (config) => {
@@ -60,8 +73,8 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       if (!storedRefresh) {
         clearTokens()
-        window.location.href = '/login'
-        return Promise.reject(error)
+        globalThis.location.href = '/login'
+        throw error
       }
 
       if (isRefreshing) {
@@ -88,15 +101,26 @@ api.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError, null)
         clearTokens()
-        window.location.href = '/login'
-        return Promise.reject(refreshError)
+        globalThis.location.href = '/login'
+        throw refreshError
       } finally {
         isRefreshing = false
       }
     }
 
-    return Promise.reject(error)
+    throw error
   },
+)
+
+// Response interceptor: decrypt classroom responses
+api.interceptors.response.use(
+  async (response) => {
+    if (isClassroomUrl(response.config.url) && response.data?.data) {
+      response.data = await decryptPayload(response.data)
+    }
+    return response
+  },
+  (error) => Promise.reject(error),
 )
 
 export default api

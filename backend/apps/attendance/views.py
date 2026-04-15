@@ -53,7 +53,11 @@ class SessionListCreateView(generics.ListCreateAPIView):
         serializer.save(maestro=self.request.user)
 
 
-class SessionDetailView(generics.RetrieveAPIView):
+class SessionDetailView(generics.RetrieveDestroyAPIView):
+    """
+    GET    sessions/<pk>/  → detalle de sesión
+    DELETE sessions/<pk>/  → elimina la sesión (no permitido si está procesando)
+    """
     serializer_class = AttendanceSessionSerializer
     permission_classes = [IsAuthenticated]
 
@@ -64,6 +68,12 @@ class SessionDetailView(generics.RetrieveAPIView):
         if not self.request.user.is_admin:
             qs = qs.filter(maestro=self.request.user)
         return qs
+
+    def perform_destroy(self, instance):
+        if instance.status == AttendanceSession.STATUS_PROCESSING:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError('No se puede eliminar una sesión mientras se está procesando.')
+        instance.delete()
 
 
 class UploadVideoView(APIView):

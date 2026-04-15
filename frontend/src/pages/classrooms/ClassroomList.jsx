@@ -33,7 +33,7 @@ export default function ClassroomList() {
       const res = await api.get('/classrooms/')
       setClassrooms(res.data.results || res.data)
     } catch (err) {
-      setError(err.response?.data?.detail || 'Error al cargar grupos.')
+      setError(err.response?.data?.detail || 'No se pudieron cargar los grupos. Verifica tu conexión.')
     } finally {
       setLoading(false)
     }
@@ -51,17 +51,45 @@ export default function ClassroomList() {
     setFormError('')
   }
 
+  const validateClassroomForm = () => {
+    if (!form.name.trim() || form.name.trim().length < 2) {
+      return 'El nombre del grupo debe tener al menos 2 caracteres.'
+    }
+    if (form.name.trim().length > 100) {
+      return 'El nombre del grupo no puede exceder 100 caracteres.'
+    }
+    if (!form.subject.trim() || form.subject.trim().length < 2) {
+      return 'La materia debe tener al menos 2 caracteres.'
+    }
+    if (form.subject.trim().length > 100) {
+      return 'La materia no puede exceder 100 caracteres.'
+    }
+    return null
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setFormError('')
+
+    const validationError = validateClassroomForm()
+    if (validationError) {
+      setFormError(validationError)
+      return
+    }
+
     setFormLoading(true)
     try {
-      await api.post('/classrooms/', form)
+      await api.post('/classrooms/', { name: form.name.trim(), subject: form.subject.trim() })
       closeModal()
       fetchClassrooms()
     } catch (err) {
       const data = err.response?.data
-      setFormError(data ? Object.values(data).flat().join(' | ') : 'Error al crear grupo.')
+      if (data) {
+        const msgs = Object.values(data).flat()
+        setFormError(msgs[0] || 'No se pudo crear el grupo. Verifica los datos.')
+      } else {
+        setFormError('No se pudo conectar con el servidor. Intenta de nuevo.')
+      }
     } finally {
       setFormLoading(false)
     }
@@ -73,9 +101,65 @@ export default function ClassroomList() {
       setDeleteConfirm(null)
       fetchClassrooms()
     } catch (err) {
-      setError(err.response?.data?.detail || 'Error al eliminar grupo.')
+      const msg = err.response?.data?.detail || err.response?.data?.error
+      setError(msg || 'No se pudo eliminar el grupo. Intenta de nuevo.')
     }
   }
+
+  const emptyOrList = visibleClassrooms.length === 0 ? (
+    <div className="bg-white rounded-xl border p-10 text-center text-gray-400">
+      <Search size={28} className="mx-auto mb-3 opacity-30" />
+      <p className="text-sm">Sin resultados para "<strong>{search}</strong>"</p>
+    </div>
+  ) : (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {visibleClassrooms.map(classroom => (
+        <div key={classroom.id} className="bg-white rounded-xl border hover:shadow-md transition-shadow flex flex-col">
+          <div className="p-5 flex-1">
+            <div className="flex items-start justify-between mb-3">
+              <div className="w-11 h-11 bg-blue-50 rounded-xl flex items-center justify-center">
+                <BookOpen size={20} className="text-blue-600" />
+              </div>
+              <span className="bg-gray-100 text-gray-600 text-xs font-medium px-2.5 py-1 rounded-full">
+                {classroom.student_count || 0} alumnos
+              </span>
+            </div>
+            <h3 className="text-base font-bold text-gray-900 mb-0.5">{classroom.name}</h3>
+            <p className="text-gray-500 text-sm">{classroom.subject}</p>
+          </div>
+          <div className="px-5 pb-4 flex gap-2 border-t pt-4">
+            <Link
+              to={`/classrooms/${classroom.id}`}
+              className="flex-1 flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 rounded-lg transition-colors"
+            >
+              Ver Grupo <ArrowRight size={13} />
+            </Link>
+            <button
+              onClick={() => setDeleteConfirm(classroom)}
+              className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors border border-red-200"
+              title="Eliminar grupo"
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+
+  const classroomsContent = classrooms.length === 0 ? (
+    <div className="bg-white rounded-xl border p-12 text-center">
+      <BookOpen size={40} className="mx-auto mb-4 text-gray-300" />
+      <p className="text-lg font-medium text-gray-600 mb-1">Sin grupos</p>
+      <p className="text-sm text-gray-400 mb-6">Crea tu primer grupo para comenzar</p>
+      <button
+        onClick={openCreate}
+        className="inline-flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
+      >
+        <Plus size={14} /> Crear Grupo
+      </button>
+    </div>
+  ) : emptyOrList
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -129,58 +213,7 @@ export default function ClassroomList() {
             </div>
           ))}
         </div>
-      ) : classrooms.length === 0 ? (
-        <div className="bg-white rounded-xl border p-12 text-center">
-          <BookOpen size={40} className="mx-auto mb-4 text-gray-300" />
-          <p className="text-lg font-medium text-gray-600 mb-1">Sin grupos</p>
-          <p className="text-sm text-gray-400 mb-6">Crea tu primer grupo para comenzar</p>
-          <button
-            onClick={openCreate}
-            className="inline-flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
-          >
-            <Plus size={14} /> Crear Grupo
-          </button>
-        </div>
-      ) : visibleClassrooms.length === 0 ? (
-        <div className="bg-white rounded-xl border p-10 text-center text-gray-400">
-          <Search size={28} className="mx-auto mb-3 opacity-30" />
-          <p className="text-sm">Sin resultados para "<strong>{search}</strong>"</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {visibleClassrooms.map(classroom => (
-            <div key={classroom.id} className="bg-white rounded-xl border hover:shadow-md transition-shadow flex flex-col">
-              <div className="p-5 flex-1">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="w-11 h-11 bg-blue-50 rounded-xl flex items-center justify-center">
-                    <BookOpen size={20} className="text-blue-600" />
-                  </div>
-                  <span className="bg-gray-100 text-gray-600 text-xs font-medium px-2.5 py-1 rounded-full">
-                    {classroom.student_count || 0} alumnos
-                  </span>
-                </div>
-                <h3 className="text-base font-bold text-gray-900 mb-0.5">{classroom.name}</h3>
-                <p className="text-gray-500 text-sm">{classroom.subject}</p>
-              </div>
-              <div className="px-5 pb-4 flex gap-2 border-t pt-4">
-                <Link
-                  to={`/classrooms/${classroom.id}`}
-                  className="flex-1 flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 rounded-lg transition-colors"
-                >
-                  Ver Grupo <ArrowRight size={13} />
-                </Link>
-                <button
-                  onClick={() => setDeleteConfirm(classroom)}
-                  className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors border border-red-200"
-                  title="Eliminar grupo"
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      ) : classroomsContent}
 
       {/* Create Modal */}
       {showModal && (
@@ -194,8 +227,9 @@ export default function ClassroomList() {
                 </div>
               )}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Nombre del grupo</label>
+                <label htmlFor="classroom-name" className="block text-sm font-medium text-gray-700 mb-1.5">Nombre del grupo</label>
                 <input
+                  id="classroom-name"
                   type="text"
                   value={form.name}
                   onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))}
@@ -205,8 +239,9 @@ export default function ClassroomList() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Materia</label>
+                <label htmlFor="classroom-subject" className="block text-sm font-medium text-gray-700 mb-1.5">Materia</label>
                 <input
+                  id="classroom-subject"
                   type="text"
                   value={form.subject}
                   onChange={(e) => setForm(f => ({ ...f, subject: e.target.value }))}

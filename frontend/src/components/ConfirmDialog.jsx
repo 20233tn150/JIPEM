@@ -30,9 +30,11 @@ export default function ConfirmDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Overlay */}
-      <div
+      <button
         className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
-        onClick={!loading ? onCancel : undefined}
+        type="button"
+        onClick={loading ? undefined : onCancel}
+        disabled={loading}
       />
 
       {/* Dialog */}

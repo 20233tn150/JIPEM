@@ -13,12 +13,29 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+
+    if (!form.username.trim()) {
+      setError('Ingresa tu nombre de usuario.')
+      return
+    }
+    if (!form.password) {
+      setError('Ingresa tu contraseña.')
+      return
+    }
+
     setLoading(true)
     try {
-      await login(form.username, form.password)
+      await login(form.username.trim(), form.password)
       navigate('/classrooms')
     } catch (err) {
-      setError(err.response?.data?.detail || 'Credenciales incorrectas.')
+      const status = err.response?.status
+      if (status === 401 || status === 400) {
+        setError('Usuario o contraseña incorrectos. Verifica tus datos e intenta de nuevo.')
+      } else if (status >= 500) {
+        setError('El servidor no está disponible en este momento. Intenta más tarde.')
+      } else {
+        setError('No se pudo iniciar sesión. Verifica tu conexión e intenta de nuevo.')
+      }
     } finally {
       setLoading(false)
     }
@@ -49,10 +66,11 @@ export default function Login() {
             )}
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Usuario</label>
+              <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1.5">Usuario</label>
               <div className="relative">
                 <User size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
+                  id="username"
                   type="text"
                   value={form.username}
                   onChange={(e) => setForm(f => ({ ...f, username: e.target.value }))}
@@ -64,10 +82,11 @@ export default function Login() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Contraseña</label>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1.5">Contraseña</label>
               <div className="relative">
                 <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
+                  id="password"
                   type="password"
                   value={form.password}
                   onChange={(e) => setForm(f => ({ ...f, password: e.target.value }))}

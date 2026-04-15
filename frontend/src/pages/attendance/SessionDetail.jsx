@@ -71,7 +71,7 @@ export default function SessionDetail() {
   const handleToggle = async (record) => {
     setToggling(record.id)
     try {
-      const res = await api.patch(`/attendance/records/${record.id}/toggle/`)
+      const res = await api.patch(`/attendance/records/${record.id}/`)
       setRecords(prev =>
         prev.map(r => r.id === record.id ? { ...r, is_present: res.data.is_present } : r)
       )
@@ -89,14 +89,14 @@ export default function SessionDetail() {
         responseType: 'blob'
       });
 
-      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const url = globalThis.URL.createObjectURL(new Blob([res.data]));
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', `Reporte_Asistencia_${session.classroom_name || id}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();
-      window.URL.revokeObjectURL(url);
+      globalThis.URL.revokeObjectURL(url);
     } catch (err) {
       console.error("Error al descargar PDF:", err);
       alert("No se pudo generar el archivo PDF.");
@@ -129,7 +129,7 @@ export default function SessionDetail() {
   const handleDelete = async () => {
     setDeleteLoading(true)
     try {
-      await api.delete(`/attendance/sessions/${id}/delete/`)
+      await api.delete(`/attendance/sessions/${id}/`)
       navigate('/attendance')
     } catch (err) {
       setRetryError(err.response?.data?.error || 'Error al eliminar la sesión.')
@@ -373,48 +373,49 @@ export default function SessionDetail() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {records.map(record => (
-                  <tr key={record.id} className={`hover:bg-gray-50 transition-colors ${!record.is_present ? 'opacity-60' : ''}`}>
-                    <td className="px-6 py-4 font-medium text-gray-900">
-                      {record.student_name || record.student?.name || '—'}
-                    </td>
-                    <td className="px-6 py-4 font-mono text-gray-600 text-xs">
-                      {record.student_matricula || record.student?.matricula || '—'}
-                    </td>
-                    <td className="px-6 py-4">
-                      {isCompleted ? (
-                        <button
-                          onClick={() => handleToggle(record)}
-                          disabled={toggling === record.id}
-                          title="Haz clic para cambiar manualmente"
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all hover:ring-2 hover:ring-offset-1 disabled:opacity-50 ${record.is_present
-                            ? 'bg-green-100 text-green-800 hover:ring-green-400'
-                            : 'bg-red-100 text-red-800 hover:ring-red-400'
-                            }`}
-                        >
-                          {toggling === record.id ? (
-                            <RefreshCw size={11} className="animate-spin" />
-                          ) : record.is_present ? (
-                            <CheckCircle size={11} />
-                          ) : (
-                            <XCircle size={11} />
-                          )}
-                          {record.is_present ? 'Presente' : 'Ausente'}
-                        </button>
-                      ) : (
-                        record.is_present ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            <CheckCircle size={12} /> Presente
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                            <XCircle size={12} /> Ausente
-                          </span>
-                        )
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {records.map(record => {
+                  const presentIcon = record.is_present ? <CheckCircle size={11} /> : <XCircle size={11} />
+                  const toggleIcon = toggling === record.id
+                    ? <RefreshCw size={11} className="animate-spin" />
+                    : presentIcon
+
+                  const staticBadge = record.is_present ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      <CheckCircle size={12} /> Presente
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                      <XCircle size={12} /> Ausente
+                    </span>
+                  )
+
+                  return (
+                    <tr key={record.id} className={`hover:bg-gray-50 transition-colors ${record.is_present ? '' : 'opacity-60'}`}>
+                      <td className="px-6 py-4 font-medium text-gray-900">
+                        {record.student_name || record.student?.name || '—'}
+                      </td>
+                      <td className="px-6 py-4 font-mono text-gray-600 text-xs">
+                        {record.student_matricula || record.student?.matricula || '—'}
+                      </td>
+                      <td className="px-6 py-4">
+                        {isCompleted ? (
+                          <button
+                            onClick={() => handleToggle(record)}
+                            disabled={toggling === record.id}
+                            title="Haz clic para cambiar manualmente"
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all hover:ring-2 hover:ring-offset-1 disabled:opacity-50 ${record.is_present
+                              ? 'bg-green-100 text-green-800 hover:ring-green-400'
+                              : 'bg-red-100 text-red-800 hover:ring-red-400'
+                              }`}
+                          >
+                            {toggleIcon}
+                            {record.is_present ? 'Presente' : 'Ausente'}
+                          </button>
+                        ) : staticBadge}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

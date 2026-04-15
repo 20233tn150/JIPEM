@@ -13,7 +13,6 @@ export default function NewFatigueAnalysis() {
   const [selectedStudent, setSelectedStudent] = useState('')
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
   const [videoFile, setVideoFile] = useState(null)
-  const [analysis, setAnalysis] = useState(null)
   const [processingStatus, setProcessingStatus] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -48,10 +47,9 @@ export default function NewFatigueAnalysis() {
     formData.append('video', videoFile)
 
     try {
-      const res = await api.post('/fatigue/individual/create/', formData, {
+      const res = await api.post('/fatigue/individual/', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
-      setAnalysis(res.data)
       setProcessingStatus('processing')
       startPolling(res.data.id)
     } catch (err) {
@@ -118,6 +116,11 @@ export default function NewFatigueAnalysis() {
     )
   }
 
+  let studentPlaceholder
+  if (loadingStudents) { studentPlaceholder = 'Cargando alumnos...' }
+  else if (selectedClassroom) { studentPlaceholder = 'Seleccionar alumno...' }
+  else { studentPlaceholder = 'Primero selecciona un grupo' }
+
   return (
     <div className="p-6 max-w-xl mx-auto">
       <div className="mb-3">
@@ -159,13 +162,7 @@ export default function NewFatigueAnalysis() {
               value={selectedStudent}
               onChange={setSelectedStudent}
               options={studentOptions}
-              placeholder={
-                loadingStudents
-                  ? 'Cargando alumnos...'
-                  : selectedClassroom
-                    ? 'Seleccionar alumno...'
-                    : 'Primero selecciona un grupo'
-              }
+              placeholder={studentPlaceholder}
               disabled={!selectedClassroom || loadingStudents}
               ringColor="ring-purple-500"
             />
@@ -176,8 +173,9 @@ export default function NewFatigueAnalysis() {
 
           {/* Fecha */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Fecha</label>
+            <label htmlFor="analysis-date" className="block text-sm font-medium text-gray-700 mb-1.5">Fecha</label>
             <input
+              id="analysis-date"
               type="date"
               value={date}
               onChange={e => setDate(e.target.value)}
@@ -188,8 +186,9 @@ export default function NewFatigueAnalysis() {
 
           {/* Video */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Video del alumno</label>
+            <label htmlFor="analysis-video" className="block text-sm font-medium text-gray-700 mb-1.5">Video del alumno</label>
             <input
+              id="analysis-video"
               type="file"
               accept=".mp4,.avi,.mov,.mkv"
               onChange={e => setVideoFile(e.target.files[0])}
