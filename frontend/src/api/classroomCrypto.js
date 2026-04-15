@@ -67,3 +67,9 @@ export function isClassroomUrl(url = '') {
   // Matches /classrooms/ and /classrooms/<id>/  but not /classrooms/<id>/students/
   return /^\/classrooms\/\d*\/?$/.test(url)
 }
+
+/** True if the request URL targets a fatigue endpoint. */
+export function isFatigueUrl(url = '') {
+  // Matches /fatigue/individual/, /fatigue/individual/<id>/, /fatigue/individual/<id>/status/
+  return /^\/fatigue\/individual\//.test(url)
+}

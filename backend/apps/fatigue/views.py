@@ -8,6 +8,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.classrooms.crypto import EncryptedJSONRenderer
 from .models import IndividualFatigueAnalysis
 from .serializers import IndividualFatigueAnalysisSerializer
 from .tasks import start_individual_fatigue_processing
@@ -24,6 +25,7 @@ class IndividualFatigueListView(generics.ListAPIView):
     """
     serializer_class = IndividualFatigueAnalysisSerializer
     permission_classes = [IsAuthenticated]
+    renderer_classes = [EncryptedJSONRenderer]
 
     def get_queryset(self):
         qs = IndividualFatigueAnalysis.objects.select_related(
@@ -90,6 +92,7 @@ class IndividualFatigueDetailView(generics.RetrieveAPIView):
     """Detalle de un análisis individual por id."""
     serializer_class = IndividualFatigueAnalysisSerializer
     permission_classes = [IsAuthenticated]
+    renderer_classes = [EncryptedJSONRenderer]
 
     def get_queryset(self):
         qs = IndividualFatigueAnalysis.objects.select_related('student__classroom', 'maestro')
@@ -101,6 +104,7 @@ class IndividualFatigueDetailView(generics.RetrieveAPIView):
 class IndividualFatigueStatusView(APIView):
     """Endpoint de polling — devuelve solo el estado actual del análisis."""
     permission_classes = [IsAuthenticated]
+    renderer_classes = [EncryptedJSONRenderer]
 
     def get(self, request, pk):
         qs = IndividualFatigueAnalysis.objects.all()
@@ -117,6 +121,7 @@ class IndividualFatigueStatusView(APIView):
 class IndividualFatigueDeleteView(APIView):
     """Elimina un análisis individual (cualquier estado excepto procesando)."""
     permission_classes = [IsAuthenticated]
+    renderer_classes = [EncryptedJSONRenderer]
 
     def delete(self, request, pk):
         qs = IndividualFatigueAnalysis.objects.all()

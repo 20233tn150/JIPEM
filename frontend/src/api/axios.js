@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { encryptPayload, decryptPayload, isClassroomUrl } from './classroomCrypto'
+import { encryptPayload, decryptPayload, isClassroomUrl, isFatigueUrl } from './classroomCrypto'
 
 const BASE_URL = import.meta.env.VITE_API_URL
 
@@ -112,10 +112,11 @@ api.interceptors.response.use(
   },
 )
 
-// Response interceptor: decrypt classroom responses
+// Response interceptor: decrypt classroom and fatigue responses
 api.interceptors.response.use(
   async (response) => {
-    if (isClassroomUrl(response.config.url) && response.data?.data) {
+    const url = response.config.url
+    if ((isClassroomUrl(url) || isFatigueUrl(url)) && response.data?.data) {
       response.data = await decryptPayload(response.data)
     }
     return response
