@@ -24,7 +24,7 @@ class AuditLog(models.Model):
     
     mysql_user = models.CharField(max_length=100, blank=True)
     
-    table_name = models.CharField(max_length=100, blank=True, null=True)
+    table_name = models.CharField(max_length=100, blank=True, default='')
     
     event_type = models.CharField(max_length=50, choices=EVENT_CHOICES)
     description = models.TextField()

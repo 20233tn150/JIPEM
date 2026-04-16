@@ -1,5 +1,4 @@
 import axios from 'axios'
-import { encryptPayload, decryptPayload, isClassroomUrl } from './classroomCrypto'
 
 const BASE_URL = import.meta.env.VITE_API_URL
 
@@ -39,18 +38,6 @@ const api = axios.create({
   baseURL: BASE_URL,
   headers: { 'Content-Type': 'application/json' },
 })
-
-// Request interceptor: encrypt classroom payloads
-api.interceptors.request.use(
-  async (config) => {
-    if (isClassroomUrl(config.url) && config.data && !config._encrypted) {
-      config.data = await encryptPayload(config.data)
-      config._encrypted = true
-    }
-    return config
-  },
-  (error) => Promise.reject(error),
-)
 
 // Request interceptor: attach access token
 api.interceptors.request.use(
@@ -110,17 +97,6 @@ api.interceptors.response.use(
 
     throw error
   },
-)
-
-// Response interceptor: decrypt classroom responses
-api.interceptors.response.use(
-  async (response) => {
-    if (isClassroomUrl(response.config.url) && response.data?.data) {
-      response.data = await decryptPayload(response.data)
-    }
-    return response
-  },
-  (error) => Promise.reject(error),
 )
 
 export default api

@@ -233,18 +233,6 @@ export default function SessionDetail() {
                   <ExternalLink size={15} /> Ver HTML
                 </button>
 
-                <button
-                  onClick={downloadPDF}
-                  disabled={pdfLoading}
-                  className="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm disabled:opacity-70 disabled:cursor-not-allowed"
-                >
-                  {pdfLoading ? (
-                    <RefreshCw size={15} className="animate-spin" />
-                  ) : (
-                    <Download size={15} />
-                  )}
-                  {pdfLoading ? 'Generando...' : 'Descargar PDF'}
-                </button>
               </div>
             )}
           </div>

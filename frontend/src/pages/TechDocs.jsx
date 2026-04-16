@@ -147,7 +147,7 @@ export default function TechDocs() {
                   ['Django', '6.0.3', 'Framework principal'],
                   ['djangorestframework', '3.17.0', 'API REST'],
                   ['simplejwt', '5.5.1', 'Autenticación JWT'],
-                  ['opencv-contrib-python', '4.13.0.92', 'Visión computacional'],
+                  ['opencv-contrib-python', '4.13.0.92', 'Visión computacional'], // NOSONAR - version number, not an IP address
                   ['numpy', '2.4.3', 'Álgebra lineal / arrays'],
                   ['mysqlclient', '2.2.8', 'Driver MySQL'],
                   ['python-decouple', '3.8', 'Variables de entorno'],
