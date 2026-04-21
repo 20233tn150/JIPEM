@@ -1,17 +1,32 @@
+from django.db import OperationalError, ProgrammingError
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
-from django.contrib.contenttypes.models import ContentType
+
 from .models import AuditLog
+
+
+def _should_skip_sender(sender):
+    # Avoid auditing Django internal models (e.g. django_migrations) and AuditLog itself.
+    sender_module = getattr(sender, "__module__", "")
+    return sender == AuditLog or sender_module.startswith("django.")
+
+
+def _safe_create_audit_log(**kwargs):
+    try:
+        AuditLog.objects.create(**kwargs)
+    except (ProgrammingError, OperationalError):
+        # The audit table may not exist yet while running initial migrations.
+        return
 
 @receiver(post_save)
 def audit_log_save(sender, instance, created, **kwargs):
-    if sender == AuditLog or sender.__module__.startswith('django.contrib'):
+    if _should_skip_sender(sender):
         return
 
     action = AuditLog.EVENT_INSERT if created else AuditLog.EVENT_UPDATE
     desc = f"Se {'creó' if created else 'actualizó'} un registro en {sender.__name__}: {str(instance)}"
 
-    AuditLog.objects.create(
+    _safe_create_audit_log(
         event_type=action,
         table_name=sender.__name__,
         description=desc,
@@ -20,10 +35,10 @@ def audit_log_save(sender, instance, created, **kwargs):
 
 @receiver(post_delete)
 def audit_log_delete(sender, instance, **kwargs):
-    if sender == AuditLog:
+    if _should_skip_sender(sender):
         return
 
-    AuditLog.objects.create(
+    _safe_create_audit_log(
         event_type=AuditLog.EVENT_DELETE,
         table_name=sender.__name__,
         description=f"Se eliminó un registro de {sender.__name__}: {str(instance)}",
