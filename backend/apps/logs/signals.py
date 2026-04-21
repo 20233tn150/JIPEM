@@ -14,9 +14,12 @@ def _should_skip_sender(sender):
 def _safe_create_audit_log(**kwargs):
     try:
         AuditLog.objects.create(**kwargs)
-    except (ProgrammingError, OperationalError):
-        # The audit table may not exist yet while running initial migrations.
-        return
+    except (ProgrammingError, OperationalError) as e:
+        # We only skip the error if the table doesn't exist (common during initial migrations)
+        if 'does not exist' in str(e).lower():
+            return
+        # If it's a real database issue (e.g., connection lost), we re-raise the exception
+        raise e
 
 @receiver(post_save)
 def audit_log_save(sender, instance, created, **kwargs):
