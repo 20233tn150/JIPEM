@@ -4,6 +4,7 @@ import { Upload, Loader2, CheckCircle } from 'lucide-react'
 import api from '../../api/axios'
 import PageHeader from '../../components/PageHeader'
 import SearchableSelect from '../../components/SearchableSelect'
+import DatePicker from '../../components/DatePicker'
 
 export default function NewSession() {
   const navigate = useNavigate()
@@ -154,12 +155,10 @@ export default function NewSession() {
             </div>
             <div>
               <label htmlFor="session-date" className="block text-sm font-medium text-gray-700 mb-1.5">Fecha</label>
-              <input
+              <DatePicker
                 id="session-date"
-                type="date"
                 value={form.date}
-                onChange={(e) => setForm(f => ({ ...f, date: e.target.value }))}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                onChange={(val) => setForm(f => ({ ...f, date: val }))}
                 required
               />
             </div>

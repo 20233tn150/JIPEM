@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ChevronLeft, CheckCircle, XCircle, ClipboardList, ExternalLink, RefreshCw, Upload, Trash2, AlertTriangle, Download } from 'lucide-react'
+import { ChevronLeft, CheckCircle, XCircle, ClipboardList, ExternalLink, RefreshCw, Upload, Trash2, AlertTriangle } from 'lucide-react'
 import api from '../../api/axios'
 import PageHeader from '../../components/PageHeader'
 import StatusBadge from '../../components/StatusBadge'
 import ConfirmDialog from '../../components/ConfirmDialog'
+import { Card, CardContent } from '../../components/ui/card'
 
 export default function SessionDetail() {
   const { id } = useParams()
@@ -20,7 +21,6 @@ export default function SessionDetail() {
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [retryError, setRetryError] = useState('')
   const pollingRef = useRef(null)
-  const [pdfLoading, setPdfLoading] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -81,29 +81,6 @@ export default function SessionDetail() {
     }
   }
 
-  const downloadPDF = async () => {
-    setPdfLoading(true)
-    try {
-      const res = await api.get(`/reports/attendance/pdf/`, {
-        params: { session_id: id },
-        responseType: 'blob'
-      });
-
-      const url = globalThis.URL.createObjectURL(new Blob([res.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `Reporte_Asistencia_${session.classroom_name || id}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      globalThis.URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error("Error al descargar PDF:", err);
-      alert("No se pudo generar el archivo PDF.");
-    } finally {
-      setPdfLoading(false)
-    }
-  };
 
   if (loading) {
     return (
@@ -211,33 +188,32 @@ export default function SessionDetail() {
 
       <PageHeader
         title={`Sesión del ${session?.date}`}
+        mobileTitle={session?.date}
         subtitle={session?.classroom_name || `Grupo ${session?.classroom}`}
-        action={
-          <div className="flex items-center gap-2">
-            {canDelete && (
-              <button
-                onClick={() => setDeleteConfirm(true)}
-                disabled={deleteLoading}
-                className="bg-red-100 hover:bg-red-200 text-red-700 font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm disabled:opacity-50"
-              >
-                <Trash2 size={15} />
-                Eliminar sesión
-              </button>
-            )}
-            {isCompleted && (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={openReport}
-                  className="bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm"
-                >
-                  <ExternalLink size={15} /> Ver HTML
-                </button>
-
-              </div>
-            )}
-          </div>
-        }
       />
+
+      {/* Acciones en grid de 3 columnas */}
+      <div className="grid grid-cols-2 gap-3 mb-6">
+        <button
+          onClick={() => setDeleteConfirm(true)}
+          disabled={!canDelete || deleteLoading}
+          className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 font-medium text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <Trash2 size={15} />
+          <span className="hidden sm:inline">Eliminar sesión</span>
+          <span className="sm:hidden">Eliminar</span>
+        </button>
+
+        <button
+          onClick={openReport}
+          disabled={!isCompleted}
+          className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 font-medium text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <ExternalLink size={15} />
+          <span className="hidden sm:inline">Ver HTML</span>
+          <span className="sm:hidden">HTML</span>
+        </button>
+      </div>
 
       {retryError && !isError && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-6 text-sm flex items-center gap-2">
@@ -351,62 +327,105 @@ export default function SessionDetail() {
             )}
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Alumno</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Matrícula</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Asistencia</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {records.map(record => {
-                  const presentIcon = record.is_present ? <CheckCircle size={11} /> : <XCircle size={11} />
-                  const toggleIcon = toggling === record.id
-                    ? <RefreshCw size={11} className="animate-spin" />
-                    : presentIcon
+          <>
+            {/* Mobile — cards */}
+            <div className="md:hidden divide-y divide-gray-100">
+              {records.map(record => {
+                const name = record.student_name || record.student?.name || '—'
+                const matricula = record.student_matricula || record.student?.matricula || '—'
+                const isLoading = toggling === record.id
 
-                  const staticBadge = record.is_present ? (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                      <CheckCircle size={12} /> Presente
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                      <XCircle size={12} /> Ausente
-                    </span>
-                  )
+                const badge = (clickable) => (
+                  <button
+                    onClick={clickable ? () => handleToggle(record) : undefined}
+                    disabled={isLoading || !clickable}
+                    title={clickable ? 'Toca para cambiar manualmente' : undefined}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all
+                      ${record.is_present
+                        ? 'bg-green-100 text-green-800' + (clickable ? ' hover:ring-2 hover:ring-green-400 hover:ring-offset-1' : '')
+                        : 'bg-red-100 text-red-800'   + (clickable ? ' hover:ring-2 hover:ring-red-400 hover:ring-offset-1' : '')
+                      } disabled:opacity-50`}
+                  >
+                    {isLoading
+                      ? <RefreshCw size={11} className="animate-spin" />
+                      : record.is_present ? <CheckCircle size={11} /> : <XCircle size={11} />
+                    }
+                    {record.is_present ? 'Presente' : 'Ausente'}
+                  </button>
+                )
 
-                  return (
-                    <tr key={record.id} className={`hover:bg-gray-50 transition-colors ${record.is_present ? '' : 'opacity-60'}`}>
-                      <td className="px-6 py-4 font-medium text-gray-900">
-                        {record.student_name || record.student?.name || '—'}
-                      </td>
-                      <td className="px-6 py-4 font-mono text-gray-600 text-xs">
-                        {record.student_matricula || record.student?.matricula || '—'}
-                      </td>
-                      <td className="px-6 py-4">
-                        {isCompleted ? (
-                          <button
-                            onClick={() => handleToggle(record)}
-                            disabled={toggling === record.id}
-                            title="Haz clic para cambiar manualmente"
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all hover:ring-2 hover:ring-offset-1 disabled:opacity-50 ${record.is_present
-                              ? 'bg-green-100 text-green-800 hover:ring-green-400'
-                              : 'bg-red-100 text-red-800 hover:ring-red-400'
+                return (
+                  <Card key={record.id} className={`rounded-none border-0 shadow-none ${record.is_present ? '' : 'opacity-60'}`}>
+                    <CardContent className="px-4 py-3.5 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-gray-900 text-sm truncate">{name}</p>
+                        <p className="text-xs font-mono text-gray-400 mt-0.5">{matricula}</p>
+                      </div>
+                      {badge(isCompleted)}
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+
+            {/* Desktop — tabla */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Alumno</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Matrícula</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Asistencia</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {records.map(record => {
+                    const isLoading = toggling === record.id
+                    const presentIcon = record.is_present ? <CheckCircle size={11} /> : <XCircle size={11} />
+                    const toggleIcon = isLoading ? <RefreshCw size={11} className="animate-spin" /> : presentIcon
+
+                    const staticBadge = record.is_present ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <CheckCircle size={12} /> Presente
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                        <XCircle size={12} /> Ausente
+                      </span>
+                    )
+
+                    return (
+                      <tr key={record.id} className={`hover:bg-gray-50 transition-colors ${record.is_present ? '' : 'opacity-60'}`}>
+                        <td className="px-6 py-4 font-medium text-gray-900">
+                          {record.student_name || record.student?.name || '—'}
+                        </td>
+                        <td className="px-6 py-4 font-mono text-gray-600 text-xs">
+                          {record.student_matricula || record.student?.matricula || '—'}
+                        </td>
+                        <td className="px-6 py-4">
+                          {isCompleted ? (
+                            <button
+                              onClick={() => handleToggle(record)}
+                              disabled={isLoading}
+                              title="Haz clic para cambiar manualmente"
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all hover:ring-2 hover:ring-offset-1 disabled:opacity-50 ${
+                                record.is_present
+                                  ? 'bg-green-100 text-green-800 hover:ring-green-400'
+                                  : 'bg-red-100 text-red-800 hover:ring-red-400'
                               }`}
-                          >
-                            {toggleIcon}
-                            {record.is_present ? 'Presente' : 'Ausente'}
-                          </button>
-                        ) : staticBadge}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+                            >
+                              {toggleIcon}
+                              {record.is_present ? 'Presente' : 'Ausente'}
+                            </button>
+                          ) : staticBadge}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 

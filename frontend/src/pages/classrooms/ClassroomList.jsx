@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import { Plus, BookOpen, Trash2, ArrowRight, Search, X, Pencil } from 'lucide-react'
 import api from '../../api/axios'
 import PageHeader from '../../components/PageHeader'
+import Modal from '../../components/Modal'
+import ConfirmDialog from '../../components/ConfirmDialog'
 
 const EMPTY_FORM = { name: '', subject: '' }
 
@@ -187,6 +189,7 @@ export default function ClassroomList() {
       <PageHeader
         title="Grupos"
         subtitle="Gestiona tus grupos de alumnos"
+        mobileSubtitle="Gestiona tus grupos"
         action={
           <button
             onClick={openCreate}
@@ -236,74 +239,64 @@ export default function ClassroomList() {
         </div>
       ) : classroomsContent}
 
-      {/* Create Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
-            <h2 className="text-lg font-bold text-gray-900 mb-5">{editTarget ? 'Editar Grupo' : 'Nuevo Grupo'}</h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {formError && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-                  {formError}
-                </div>
-              )}
-              <div>
-                <label htmlFor="classroom-name" className="block text-sm font-medium text-gray-700 mb-1.5">Nombre del grupo</label>
-                <input
-                  id="classroom-name"
-                  type="text"
-                  value={form.name}
-                  onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                  placeholder="Ej. Grupo A"
-                  required
-                />
-              </div>
-              <div>
-                <label htmlFor="classroom-subject" className="block text-sm font-medium text-gray-700 mb-1.5">Materia</label>
-                <input
-                  id="classroom-subject"
-                  type="text"
-                  value={form.subject}
-                  onChange={(e) => setForm(f => ({ ...f, subject: e.target.value }))}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                  placeholder="Ej. Matemáticas"
-                  required
-                />
-              </div>
-              <div className="flex gap-3 pt-1">
-                <button type="button" onClick={closeModal} className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-gray-700 text-sm">
-                  Cancelar
-                </button>
-                <button type="submit" disabled={formLoading} className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-lg transition-colors text-sm">
-                  {formLoading ? (editTarget ? 'Guardando...' : 'Creando...') : (editTarget ? 'Guardar Cambios' : 'Crear Grupo')}
-                </button>
-              </div>
-            </form>
+      {/* Create / Edit Modal */}
+      <Modal
+        open={showModal}
+        onClose={closeModal}
+        title={editTarget ? 'Editar Grupo' : 'Nuevo Grupo'}
+        size="sm"
+        mobileDrawer
+      >
+        <form onSubmit={handleSubmit} className="space-y-4 -mt-2">
+          {formError && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+              {formError}
+            </div>
+          )}
+          <div>
+            <label htmlFor="classroom-name" className="block text-sm font-medium text-gray-700 mb-1.5">Nombre del grupo</label>
+            <input
+              id="classroom-name"
+              type="text"
+              value={form.name}
+              onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+              placeholder="Ej. Grupo A"
+              required
+            />
           </div>
-        </div>
-      )}
+          <div>
+            <label htmlFor="classroom-subject" className="block text-sm font-medium text-gray-700 mb-1.5">Materia</label>
+            <input
+              id="classroom-subject"
+              type="text"
+              value={form.subject}
+              onChange={(e) => setForm(f => ({ ...f, subject: e.target.value }))}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+              placeholder="Ej. Matemáticas"
+              required
+            />
+          </div>
+          <div className="flex flex-col sm:flex-row-reverse gap-2 pt-1">
+            <button type="submit" disabled={formLoading} className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl transition-colors text-sm">
+              {formLoading ? (editTarget ? 'Guardando...' : 'Creando...') : (editTarget ? 'Guardar Cambios' : 'Crear Grupo')}
+            </button>
+            <button type="button" onClick={closeModal} className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors text-gray-700 text-sm">
+              Cancelar
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       {/* Delete Confirmation */}
-      {deleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6">
-            <h2 className="text-lg font-bold text-gray-900 mb-2">Confirmar eliminación</h2>
-            <p className="text-gray-600 text-sm mb-6">
-              ¿Estás seguro de eliminar el grupo <strong>{deleteConfirm.name}</strong>?
-              Se eliminarán también todos sus alumnos y registros.
-            </p>
-            <div className="flex gap-3">
-              <button onClick={() => setDeleteConfirm(null)} className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-gray-700 text-sm">
-                Cancelar
-              </button>
-              <button onClick={() => handleDelete(deleteConfirm.id)} className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2.5 rounded-lg transition-colors text-sm">
-                Eliminar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={!!deleteConfirm}
+        title="Eliminar grupo"
+        message={deleteConfirm ? `¿Estás seguro de eliminar el grupo "${deleteConfirm.name}"? Se eliminarán también todos sus alumnos y registros.` : ''}
+        confirmLabel="Eliminar"
+        onConfirm={() => handleDelete(deleteConfirm.id)}
+        onCancel={() => setDeleteConfirm(null)}
+      />
     </div>
   )
 }

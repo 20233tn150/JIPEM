@@ -1,16 +1,26 @@
+from io import BytesIO
+
 from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string
-from django.http import HttpResponse, HttpResponseServerError
+from django.http import HttpResponse
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
+from rest_framework.renderers import StaticHTMLRenderer
 
 from apps.attendance.models import AttendanceSession
 from apps.fatigue.models import FatigueSession, IndividualFatigueAnalysis
+
 try:
-    from weasyprint import HTML as _WeasyHTML
-except Exception:
-    _WeasyHTML = None  # GTK no disponible en este entorno; los endpoints PDF retornarán 503
-from rest_framework.renderers import StaticHTMLRenderer
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+except ImportError:
+    openpyxl = None
+
+try:
+    from xhtml2pdf import pisa as _pisa
+except ImportError:
+    _pisa = None
 
 _HTML_CONTENT_TYPE = 'text/html; charset=utf-8'
 
@@ -51,9 +61,13 @@ class AttendanceReportView(APIView):
     
 class AttendancePDFView(APIView):
     permission_classes = [IsAuthenticated]
-    renderer_classes = [StaticHTMLRenderer]
 
     def get(self, request):
+        if _pisa is None:
+            return HttpResponse(
+                'xhtml2pdf no está instalado. Corre: pip install xhtml2pdf',
+                status=503, content_type='text/plain',
+            )
         try:
             session_id = request.query_params.get('session_id')
             if not session_id:
@@ -67,26 +81,25 @@ class AttendancePDFView(APIView):
 
             records = session.records.select_related('student').order_by('student__name')
             present_count = records.filter(is_present=True).count()
+            total_count = records.count()
 
-            html_string = render_to_string('reports/attendance_report.html', {
+            html_string = render_to_string('reports/attendance_report_pdf.html', {
                 'session': session,
                 'records': records,
                 'present_count': present_count,
-                'total_count': records.count(),
+                'absent_count': total_count - present_count,
+                'total_count': total_count,
             })
 
-            if _WeasyHTML is None:
-                return HttpResponse(
-                    'La generación de PDF no está disponible en este entorno (GTK no instalado).',
-                    status=503, content_type='text/plain',
-                )
-            pdf = _WeasyHTML(
-                string=html_string,
-                base_url=request.build_absolute_uri('/')
-            ).write_pdf()
+            buffer = BytesIO()
+            result = _pisa.CreatePDF(html_string.encode('utf-8'), dest=buffer, encoding='utf-8')
 
-            response = HttpResponse(pdf, content_type='application/pdf')
-            response['Content-Disposition'] = f'attachment; filename="Asistencia_{session_id}.pdf"'
+            if result.err:
+                return HttpResponse(f"Error al generar PDF", status=500, content_type='text/plain')
+
+            buffer.seek(0)
+            response = HttpResponse(buffer.read(), content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="Asistencia_Sesion_{session_id}.pdf"'
             return response
 
         except Exception as e:
@@ -143,9 +156,13 @@ class IndividualFatigueReportView(APIView):
 
 class IndividualFatiguePDFView(APIView):
     permission_classes = [IsAuthenticated]
-    renderer_classes = [StaticHTMLRenderer] 
 
     def get(self, request):
+        if _pisa is None:
+            return HttpResponse(
+                'xhtml2pdf no está instalado. Corre: pip install xhtml2pdf',
+                status=503, content_type='text/plain',
+            )
         try:
             analysis_id = request.query_params.get('analysis_id')
             if not analysis_id:
@@ -161,20 +178,17 @@ class IndividualFatiguePDFView(APIView):
                 'student': analysis.student
             })
 
-            if _WeasyHTML is None:
-                return HttpResponse(
-                    'La generación de PDF no está disponible en este entorno (GTK no instalado).',
-                    status=503, content_type='text/plain',
-                )
-            pdf = _WeasyHTML(
-                string=html_string,
-                base_url=request.build_absolute_uri('/')
-            ).write_pdf()
+            buffer = BytesIO()
+            result = _pisa.CreatePDF(html_string.encode('utf-8'), dest=buffer, encoding='utf-8')
 
-            response = HttpResponse(pdf, content_type='application/pdf')
-            response['Content-Disposition'] = f'attachment; filename="Reporte_{analysis_id}.pdf"'
+            if result.err:
+                return HttpResponse("Error al generar PDF", status=500, content_type='text/plain')
+
+            buffer.seek(0)
+            response = HttpResponse(buffer.read(), content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="Fatiga_Individual_{analysis_id}.pdf"'
             return response
 
         except Exception as e:
-            print(f"Error en PDF: {str(e)}") 
+            print(f"Error en PDF: {str(e)}")
             return HttpResponse(f"Error: {str(e)}", status=500, content_type="text/plain")

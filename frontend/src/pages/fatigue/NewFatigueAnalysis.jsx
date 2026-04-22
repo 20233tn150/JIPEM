@@ -4,6 +4,7 @@ import { ChevronLeft, Loader2, Play, Activity, Eye, Smile, User, Users } from 'l
 import api from '../../api/axios'
 import PageHeader from '../../components/PageHeader'
 import SearchableSelect from '../../components/SearchableSelect'
+import DatePicker from '../../components/DatePicker'
 
 export default function NewFatigueAnalysis() {
   const navigate = useNavigate()
@@ -129,7 +130,7 @@ export default function NewFatigueAnalysis() {
         </Link>
       </div>
 
-      <PageHeader title="Nuevo Análisis Individual" subtitle="Selecciona un alumno y sube su video" />
+      <PageHeader title="Nuevo Análisis Individual" subtitle="Selecciona un alumno y sube su video" mobileSubtitle="Nuevo análisis" />
 
       <div className="bg-white rounded-xl border p-6">
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -174,12 +175,10 @@ export default function NewFatigueAnalysis() {
           {/* Fecha */}
           <div>
             <label htmlFor="analysis-date" className="block text-sm font-medium text-gray-700 mb-1.5">Fecha</label>
-            <input
+            <DatePicker
               id="analysis-date"
-              type="date"
               value={date}
-              onChange={e => setDate(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none text-sm"
+              onChange={setDate}
               required
             />
           </div>

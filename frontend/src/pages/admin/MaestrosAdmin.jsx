@@ -185,6 +185,7 @@ export default function MaestrosAdmin() {
       <PageHeader
         title="Gestión de Maestros"
         subtitle="Administra las cuentas de los usuarios del sistema"
+        mobileSubtitle="Usuarios del sistema"
         action={
           <button
             onClick={openCreate}
