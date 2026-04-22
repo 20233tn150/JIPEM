@@ -41,6 +41,8 @@ def _get_face_app():
 # ── Classroom CRUD ───────────────────────────────────────────────────────────
 
 class ClassroomListCreateView(generics.ListCreateAPIView):
+    """Lista los grupos activos del maestro autenticado o todos los grupos si es admin."""
+
     serializer_class = ClassroomSerializer
     permission_classes = [IsAuthenticated]
 
@@ -55,6 +57,8 @@ class ClassroomListCreateView(generics.ListCreateAPIView):
 
 
 class ClassroomDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Obtiene, actualiza o elimina (soft-delete) un grupo. Solo el maestro dueño o admin."""
+
     serializer_class = ClassroomSerializer
     permission_classes = [IsAuthenticated]
 
@@ -72,6 +76,8 @@ class ClassroomDetailView(generics.RetrieveUpdateDestroyAPIView):
 # ── Student CRUD ─────────────────────────────────────────────────────────────
 
 class StudentListCreateView(generics.ListCreateAPIView):
+    """Lista o crea alumnos dentro de un grupo. La matrícula debe ser única por grupo."""
+
     serializer_class = StudentSerializer
     permission_classes = [IsAuthenticated]
 
@@ -113,6 +119,12 @@ class StudentDetailView(generics.RetrieveUpdateDestroyAPIView):
 # ── Face capture ─────────────────────────────────────────────────────────────
 
 class CaptureFaceView(APIView):
+    """
+    Recibe una imagen base64 desde el frontend, extrae el embedding ArcFace 512-d
+    con InsightFace buffalo_l y lo guarda en FaceEncoding. Requiere al menos 5 muestras
+    para habilitar el análisis de asistencia y fatiga del alumno.
+    """
+
     permission_classes = [IsAuthenticated]
 
     def post(self, request, student_id):

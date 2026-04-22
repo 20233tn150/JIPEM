@@ -1,6 +1,14 @@
+/**
+ * Layout principal de la aplicación.
+ *
+ * Renderiza el sidebar de navegación y el área de contenido (Outlet).
+ * El sidebar muestra los links de navegación principales y, si el usuario
+ * tiene rol 'admin', la sección de administración de maestros.
+ */
 import { useState } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import {
+  LayoutDashboard,
   BookOpen,
   ClipboardList,
   BrainCircuit,
@@ -15,6 +23,7 @@ import {
 import { useAuth } from '../context/AuthContext'
 
 const navLinks = [
+  { to: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
   { to: '/classrooms', label: 'Grupos', Icon: BookOpen },
   { to: '/attendance', label: 'Asistencia', Icon: ClipboardList },
   { to: '/fatigue', label: 'Análisis de Fatiga', Icon: BrainCircuit },

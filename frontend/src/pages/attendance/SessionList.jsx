@@ -1,3 +1,8 @@
+/**
+ * Lista de sesiones de asistencia del maestro autenticado.
+ * Permite filtrar por grupo y navegar al detalle de cada sesión.
+ * Ruta: /attendance
+ */
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, ClipboardList, ArrowRight, Users, Calendar, Search, X } from 'lucide-react'

@@ -144,15 +144,18 @@ export default function TechDocs() {
               <Table
                 headers={['Librería', 'Versión', 'Rol']}
                 rows={[
-                  ['Django', '6.0.3', 'Framework principal'],
-                  ['djangorestframework', '3.17.0', 'API REST'],
+                  ['Django', '5.2.13', 'Framework principal'],
+                  ['djangorestframework', '3.17.1', 'API REST'],
                   ['simplejwt', '5.5.1', 'Autenticación JWT'],
-                  ['opencv-contrib-python', '4.13.0.92', 'Visión computacional'], // NOSONAR - version number, not an IP address
-                  ['numpy', '2.4.3', 'Álgebra lineal / arrays'],
-                  ['mysqlclient', '2.2.8', 'Driver MySQL'],
+                  ['insightface', '0.7.3', 'Detección y reconocimiento facial (ArcFace)'],
+                  ['onnxruntime', '1.23.2', 'Inferencia del modelo InsightFace en CPU'],
+                  ['opencv-contrib-python', '4.13.0.92', 'Análisis de ojos (PERCLOS) y decodificación de video'], // NOSONAR
+                  ['numpy', '2.2.6', 'Álgebra lineal / arrays'],
+                  ['PyMySQL', '1.1.2', 'Driver MySQL'],
                   ['python-decouple', '3.8', 'Variables de entorno'],
                   ['django-cors-headers', '4.9.0', 'Política CORS'],
-                  ['Pillow', '12.1.1', 'Procesamiento de imagen'],
+                  ['loguru', '0.7.3', 'Logging estructurado con niveles y contexto'],
+                  ['Pillow', '12.2.0', 'Procesamiento de imagen'],
                 ]}
               />
             </div>
@@ -227,56 +230,53 @@ api.interceptors.response.use(
           <Step
             n="1"
             title="Decodificación de la imagen"
-            desc="El string base64 se decodifica a bytes, se convierte en un array numpy, luego a imagen BGR (OpenCV) y finalmente a RGB."
+            desc="El string base64 se decodifica a bytes y se convierte en un array numpy BGR mediante OpenCV."
             code={`img_bytes = base64.b64decode(b64_string)
 np_arr = np.frombuffer(img_bytes, np.uint8)
-img_bgr = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)`}
+img_bgr = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)`}
             codeLang="Python"
           />
           <Step
             n="2"
-            title="Detección del rostro con Haarcascade"
-            desc="Se convierte a escala de grises y se aplica el clasificador Haarcascade frontalface para localizar caras."
-            code={`gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
-faces = _FACE_CASCADE.detectMultiScale(
-    gray,
-    scaleFactor=1.1,   # cada escala reduce la imagen 10%
-    minNeighbors=5,    # detecciones vecinas requeridas para confirmar
-    minSize=(60, 60)   # tamaño mínimo del rostro en px
-)
-# Se selecciona la cara más grande por área (w*h)`}
-            codeLang="Python — detect_and_crop_face()"
+            title="Detección y embedding con InsightFace"
+            desc="Se inicializa el modelo buffalo_l (singleton thread-safe). InsightFace detecta caras y extrae el embedding ArcFace de 512 dimensiones en un solo paso."
+            code={`face_app = _get_face_app()           # singleton thread-safe
+faces = face_app.get(img_bgr)        # detección + landmarks + embedding
+if not faces:
+    return Response({'error': 'No se detectó ningún rostro'}, status=400)
+# Seleccionar la cara con mayor score de detección
+face = max(faces, key=lambda f: f.det_score)`}
+            codeLang="Python — CaptureFaceView"
           />
           <Step
             n="3"
-            title="Recorte y normalización"
-            desc="Se aplica un padding del 10% alrededor del rostro detectado y se redimensiona a 128×128 píxeles en escala de grises."
-            code={`pad = int(0.1 * min(w, h))
-x1, y1 = max(0, x-pad), max(0, y-pad)
-x2, y2 = min(W, x+w+pad), min(H, y+h+pad)
-face_crop = gray[y1:y2, x1:x2]
-face_crop = cv2.resize(face_crop, (128, 128))`}
+            title="Normalización del vector ArcFace"
+            desc="El embedding de 512 dimensiones se normaliza a norma unitaria (L2) para que la similitud de coseno sea válida en el reconocimiento posterior."
+            code={`embedding = face.embedding.astype(np.float32)   # shape: (512,)
+norm = np.linalg.norm(embedding)
+if norm > 1e-10:
+    embedding = embedding / norm                 # vector unitario`}
             codeLang="Python"
           />
           <Step
             n="4"
             title="Almacenamiento en base de datos"
-            desc="La imagen recortada se serializa con numpy.save() en un buffer en memoria y se guarda como BinaryField en la tabla FaceEncoding."
+            desc="El vector normalizado se serializa con numpy.save() y se guarda como BinaryField en la tabla FaceEncoding."
             code={`buf = io.BytesIO()
-np.save(buf, face_crop)        # serialización numpy nativa
+np.save(buf, embedding)           # serialización numpy nativa (.npy)
 FaceEncoding.objects.create(
     student=student,
-    encoding_data=buf.getvalue()  # bytes guardados en DB
+    encoding_data=buf.getvalue()  # 512 float32 × 4 bytes = ~2 KB por muestra
 )`}
             codeLang="Python"
           />
 
           <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 mt-4 text-sm text-blue-800">
-            <strong>¿Por qué numpy.save() y no pickle?</strong> numpy.save genera un formato binario
-            estandarizado (.npy) que puede cargarse de forma segura con numpy.load(). pickle puede
-            ejecutar código arbitrario al deserializar — es un vector de seguridad. numpy.load es
-            determinístico y seguro para datos numéricos.
+            <strong>¿Qué es ArcFace?</strong> ArcFace (Additive Angular Margin) es una red neuronal profunda
+            entrenada con millones de rostros. Produce un vector de 512 números (embedding) que representa
+            la identidad facial de forma robusta ante cambios de iluminación, ángulo y oclusión parcial.
+            Dos fotos de la misma persona tendrán embeddings con similitud de coseno alta (&gt;0.35);
+            personas distintas tendrán similitud baja (&lt;0.25).
           </div>
         </Collapsible>
 
@@ -289,50 +289,56 @@ FaceEncoding.objects.create(
 
           <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Constantes del algoritmo</p>
           <div className="space-y-1 mb-4">
-            <Kv k="FRAMES_TO_SKIP" v="5 — solo se procesa 1 de cada 5 fotogramas (optimización de velocidad)" mono />
-            <Kv k="FACE_SIZE" v="(128, 128) — tamaño estándar del recorte facial" mono />
-            <Kv k="LBPH_CONFIDENCE_THRESHOLD" v="100 — confianza máxima para aceptar un match (menor = más similar)" mono />
+            <Kv k="FRAMES_TO_SKIP" v="10 — solo se procesa 1 de cada 10 fotogramas (optimización de velocidad)" mono />
+            <Kv k="COSINE_THRESHOLD" v="0.35 — similitud de coseno mínima para aceptar un match ArcFace" mono />
             <Kv k="PRESENCE_THRESHOLD_PCT" v="0.10 — el alumno debe aparecer en ≥10% de los fotogramas procesados" mono />
           </div>
 
           <Step
             n="1"
-            title="Entrenamiento del reconocedor LBPH"
-            desc="Se cargan las muestras faciales de todos los alumnos del grupo desde la DB y se entrena un reconocedor LBPH (Local Binary Pattern Histogram)."
-            code={`for idx, student in enumerate(students):
+            title="Construcción del banco de embeddings ArcFace"
+            desc="Se cargan los vectores 512-d de cada alumno desde la DB, se normalizan y se calcula el centroide (media normalizada) como vector de referencia."
+            code={`for student in students:
+    vecs = []
     for fe in student.face_encodings.all():
-        img = np.load(io.BytesIO(bytes(fe.encoding_data)))
-        face_images.append(img)
-        labels.append(idx)          # índice numérico del alumno
-
-recognizer = cv2.face.LBPHFaceRecognizer_create()
-recognizer.train(face_images, np.array(labels, dtype=np.int32))`}
+        arr = np.load(io.BytesIO(bytes(fe.encoding_data)))
+        arr = arr.flatten().astype(np.float32)
+        norm = np.linalg.norm(arr)
+        if norm > 1e-10:
+            vecs.append(arr / norm)          # normalizar cada muestra
+    if vecs:
+        mean_vec = np.mean(vecs, axis=0)
+        n = np.linalg.norm(mean_vec)
+        student_embeddings[student.id] = mean_vec / n  # centroide unitario`}
             codeLang="Python — _build_recognizer()"
           />
           <Step
             n="2"
             title="Procesamiento del video frame a frame"
-            desc="Se lee el video con OpenCV. Por cada fotograma procesado: resize 50%, escala de grises, ecualización de histograma (mejora contraste)."
+            desc="Se lee el video con OpenCV. Por cada 10° fotograma, InsightFace detecta todas las caras y extrae sus embeddings ArcFace en un solo pase."
             code={`while True:
     ret, frame = cap.read()
     if not ret: break
     total_frames += 1
-    if total_frames % FRAMES_TO_SKIP != 0: continue  # saltar 4 de cada 5
-    small = cv2.resize(frame, (0,0), fx=0.5, fy=0.5)  # mitad de resolución
-    gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)`}
+    if total_frames % FRAMES_TO_SKIP != 0: continue
+    faces = face_app.get(frame)   # detección + embeddings ArcFace`}
             codeLang="Python — loop principal"
           />
           <Step
             n="3"
-            title="Detección y reconocimiento"
-            desc="Para cada cara detectada en el fotograma, el reconocedor LBPH devuelve un label (índice de alumno) y un confidence score."
-            code={`label, confidence = recognizer.predict(face_crop_128x128)
-# confidence < 100 → match válido
-# confidence más bajo = más parecido al alumno entrenado
-if confidence < LBPH_CONFIDENCE_THRESHOLD:
-    sid = label_to_student_id[label]
-    frame_count_map[sid] += 1  # contar apariciones`}
-            codeLang="Python — _recognize_face()"
+            title="Identificación por similitud de coseno"
+            desc="Para cada cara detectada se calcula la similitud de coseno con cada alumno. Si el mejor match supera 0.35, se cuenta la aparición."
+            code={`for face in faces:
+    query = face.embedding.astype(np.float32)
+    query = query / np.linalg.norm(query)      # normalizar
+    best_id, best_score = None, -1.0
+    for sid, ref in student_embeddings.items():
+        score = float(np.dot(query, ref))      # similitud coseno [-1, 1]
+        if score > best_score:
+            best_score, best_id = score, sid
+    if best_score >= COSINE_THRESHOLD:
+        frame_count_map[best_id] += 1`}
+            codeLang="Python — _recognize_faces_in_frame()"
           />
           <Step
             n="4"
@@ -346,10 +352,11 @@ is_present = presence_map.get(student.id, 0.0) >= 0.10`}
           />
 
           <div className="bg-gray-50 border rounded-lg px-4 py-3 mt-4 text-sm text-gray-600">
-            <strong>¿Qué es LBPH?</strong> Local Binary Pattern Histogram. Describe la textura local
-            de cada píxel comparando con sus 8 vecinos, genera un histograma por región y los concatena.
-            Es rápido, no requiere GPU, funciona bien con variaciones de iluminación y es el método
-            de reconocimiento facial clásico disponible en <code className="bg-gray-200 px-1 rounded text-xs">cv2.face</code>.
+            <strong>¿Por qué similitud de coseno y no distancia euclidiana?</strong> El embedding ArcFace
+            está entrenado específicamente con pérdida de margen angular — la métrica natural es el ángulo
+            entre vectores, que equivale a la similitud de coseno. Con vectores normalizados, cosine ∈ [-1, 1]:
+            la misma persona suele dar &gt;0.35, personas distintas &lt;0.25. La distancia euclidiana
+            funcionaría también, pero coseno es más estable ante variaciones de norma.
           </div>
         </Collapsible>
 
@@ -367,35 +374,45 @@ is_present = presence_map.get(student.id, 0.0) >= 0.10`}
             <Kv k="EYE_CLOSED_CONSEC_SECS" v="0.5 segundos — tiempo mínimo de cierre para contar episodio" mono />
             <Kv k="eye_closed_frames" v="max(1, int(0.5 × fps / 5)) — con 25fps resultan ~2-3 frames" mono />
             <Kv k="PRESENCE_THRESHOLD_PCT" v="0.10 — cara debe aparecer ≥10% del video" mono />
-            <Kv k="LBPH_CONFIDENCE_THRESHOLD" v="100 — umbral para identificar al alumno correcto" mono />
+            <Kv k="COSINE_THRESHOLD" v="0.35 — similitud de coseno mínima para identificar al alumno" mono />
           </div>
 
           <Step
             n="1"
-            title="Identificar al alumno en el video"
-            desc="Igual que en asistencia, se entrena un reconocedor LBPH pero solo con las muestras del alumno analizado. Se selecciona la cara que más se parece (confidence más bajo)."
-            code={`# Solo las muestras del alumno específico
-recognizer.train(face_images, np.zeros(len(face_images), dtype=np.int32))
-# label=0 para todos → cualquier detección válida es el alumno`}
-            codeLang="Python — _build_student_recognizer()"
+            title="Construir embedding de referencia del alumno"
+            desc="Se cargan todas las muestras ArcFace del alumno desde la DB y se calcula su centroide normalizado como vector de referencia."
+            code={`# Solo muestras del alumno específico
+vecs = [np.load(...) for fe in student.face_encodings.all()]
+vecs = [v / np.linalg.norm(v) for v in vecs]   # normalizar
+mean_vec = np.mean(vecs, axis=0)
+student_ref = mean_vec / np.linalg.norm(mean_vec)  # centroide unitario`}
+            codeLang="Python — _build_student_embedding()"
           />
           <Step
             n="2"
-            title="Análisis de ojos por fotograma"
-            desc="Detectada la cara, se toma el 60% superior (zona de ojos), se escala al doble (mejora detección de ojos pequeños) y se aplica haarcascade_eye."
-            code={`top = face_crop[:int(face_crop.shape[0] * 0.6), :]  # 60% superior
-top_resized = cv2.resize(top, (0,0), fx=2.0, fy=2.0)   # x2 resolución
-
-eyes = _EYE_CASCADE.detectMultiScale(
-    top_resized,
-    scaleFactor=1.1,
-    minNeighbors=3,
-    minSize=(15, 15)
-)`}
-            codeLang="Python — _analyze_eyes()"
+            title="Identificar la cara del alumno en el frame"
+            desc="InsightFace detecta todas las caras. Se selecciona la que tenga mayor similitud de coseno con el embedding de referencia del alumno (debe superar 0.35)."
+            code={`faces = face_app.get(frame)
+best_face = _find_student_face(faces, student_ref)
+# _find_student_face: cosine(query, student_ref) >= 0.35 → match`}
+            codeLang="Python — loop principal"
           />
           <Step
             n="3"
+            title="Análisis de ojos por fotograma (PERCLOS)"
+            desc="Identificada la cara, se recorta la región BGR del rostro. Se toma el 60% superior (zona de ojos), se escala al doble y se aplica haarcascade_eye."
+            code={`# Recortar cara usando bounding box de InsightFace
+x1,y1,x2,y2 = face.bbox.astype(int)
+face_bgr = frame[y1:y2, x1:x2]
+# Analizar ojos en el 60% superior
+top = face_bgr[:int(face_bgr.shape[0] * 0.6), :]
+top_x2 = cv2.resize(top, (0,0), fx=2.0, fy=2.0)
+eyes = _EYE_CASCADE.detectMultiScale(top_x2, scaleFactor=1.1,
+                                      minNeighbors=3, minSize=(15,15))`}
+            codeLang="Python — _analyze_eyes()"
+          />
+          <Step
+            n="4"
             title="Conteo de episodios de cierre"
             desc="Si no se detectan ojos en frames consecutivos equivalentes a 0.5s, se cuenta como un episodio. Se diferencia así el parpadeo normal del cierre sostenido."
             code={`if len(eyes) == 0:
@@ -410,7 +427,7 @@ else:
             codeLang="Python"
           />
           <Step
-            n="4"
+            n="5"
             title="Cálculo de PERCLOS y puntuaciones"
             desc="PERCLOS = fracción de frames con cara visible donde NO se detectaron ojos. Se convierte en fatigue score y attention score."
             code={`perclos = 1.0 - (eye_detected_frames / face_frames)
@@ -424,7 +441,7 @@ attention = max(0.0, 100.0 - fatigue)`}
             codeLang="Python — _compute_scores()"
           />
           <Step
-            n="5"
+            n="6"
             title="Clasificación final"
             desc="La attention score determina el label que se almacena junto a los scores en la base de datos."
             code={`if attention >= 70:   return 'atento'     # PERCLOS < ~0.15
@@ -463,7 +480,7 @@ else:                 return 'fatigado'   # PERCLOS > 0.30`}
             headers={['Campo', 'Tipo', 'Notas']}
             rows={[
               ['name', 'VARCHAR(255)', ''],
-              ['matricula', 'VARCHAR(20)', 'unique, index'],
+              ['matricula', 'VARCHAR(20)', 'unique_together(matricula, classroom), index'],
               ['age', 'SMALLINT UNSIGNED', ''],
               ['sex', "CHAR(1)", "'M' | 'F'"],
               ['wears_glasses', 'BOOL', 'default=False'],
@@ -477,7 +494,7 @@ else:                 return 'fatigado'   # PERCLOS > 0.30`}
             headers={['Campo', 'Tipo', 'Notas']}
             rows={[
               ['student_id', 'FK → student', 'on_delete=CASCADE'],
-              ['encoding_data', 'LONGBLOB', 'numpy array 128×128 float64 serializado con np.save()'],
+              ['encoding_data', 'LONGBLOB', 'vector ArcFace 512-d float32 L2-normalizado, serializado con np.save()'],
               ['created_at', 'DATETIME', ''],
             ]}
           />
@@ -559,10 +576,10 @@ else:                 return 'fatigado'   # PERCLOS > 0.30`}
 {`Cámara web (MediaDevices API)
   → canvas.toDataURL('image/jpeg')
   → POST /api/classrooms/students/:id/capture-face/  { image_base64 }
-  → base64 → numpy array → BGR → RGB
-  → Haarcascade detect (scaleFactor=1.1, minNeighbors=5, minSize=60px)
-  → Recorte + padding 10% + resize 128×128
-  → np.save(buf) → FaceEncoding.encoding_data (BinaryField)
+  → base64 → numpy array → img_bgr (cv2.imdecode)
+  → InsightFace buffalo_l → detectar cara + extraer embedding ArcFace 512-d
+  → embedding / ||embedding|| → vector L2-normalizado
+  → np.save(buf, embedding) → FaceEncoding.encoding_data (BinaryField)
   → Respuesta: { count, has_enough_samples: count >= 5 }`}
           </CodeBlock>
 
@@ -575,11 +592,13 @@ else:                 return 'fatigado'   # PERCLOS > 0.30`}
   → 202 Accepted (polling frontend cada 3s a /sessions/:id/status/)
 
   [Hilo daemon]
-  → Cargar FaceEncodings de todos los alumnos del grupo
-  → Entrenar LBPHFaceRecognizer con labels por alumno
+  → Cargar embeddings ArcFace 512-d de todos los alumnos del grupo
+  → Calcular centroide L2-normalizado por alumno → student_embeddings{id: vec}
   → cap = cv2.VideoCapture(video_path)
-  → Por cada 5° frame: resize 50% → grayscale → Haarcascade faces
-  → Por cada cara: LBPH.predict() → si confidence < 100 → frame_count_map[sid]++
+  → Por cada 10° frame:
+      → InsightFace.get(frame) → lista de faces con embedding
+      → Por cada cara: cosine(face.embedding, student_ref) → si ≥ 0.35 → match
+      → frame_count_map[best_match_id]++
   → presence = frame_count_map[sid] / processed_frames
   → AttendanceRecord.is_present = presence >= 0.10
   → os.remove(video_path)`}
@@ -593,12 +612,12 @@ else:                 return 'fatigado'   # PERCLOS > 0.30`}
   → 202 Accepted
 
   [Hilo daemon]
-  → Cargar FaceEncodings del alumno → LBPHFaceRecognizer con label=0
+  → Cargar embeddings ArcFace del alumno → centroide L2-normalizado (student_ref)
   → fps = cap.get(CAP_PROP_FPS) || 25.0
   → eye_closed_frames = max(1, int(0.5 * fps / 5))
   → Por cada 5° frame:
-      → Haarcascade face → LBPH identify → mejor cara (confidence mínimo)
-      → face_crop = 60% superior → resize x2
+      → InsightFace.get(frame) → face con cosine(embedding, student_ref) ≥ 0.35
+      → face_bgr = frame[bbox] → 60% superior → resize x2
       → Haarcascade eyes (minSize=15px)
       → sin ojos: no_eye_counter++ ; si cruza umbral → closure_episodes++
       → con ojos: eye_detected_frames++ ; no_eye_counter = 0
@@ -643,16 +662,20 @@ else:                 return 'fatigado'   # PERCLOS > 0.30`}
         <Collapsible title="Preguntas técnicas frecuentes" icon={Code2} color="bg-rose-600">
           {[
             {
-              q: '¿Por qué se procesan solo 1 de cada 5 fotogramas?',
-              a: 'Un video a 25fps tiene 25 fotogramas por segundo — procesar todos es innecesario (los rostros no cambian tan rápido) y muy costoso en CPU. Con FRAMES_TO_SKIP=5 procesamos ~5fps efectivos, suficiente para detectar presencia y ojos, a una fracción del tiempo de cómputo.',
+              q: '¿Por qué se procesan solo 1 de cada N fotogramas?',
+              a: 'En asistencia se usa FRAMES_TO_SKIP=10 (procesa ~3fps en un video de 30fps) y en fatiga FRAMES_TO_SKIP=5 (~5fps). Procesar todos los frames sería innecesario —los rostros no cambian tan rápido— y muy costoso: InsightFace con ArcFace es más pesado que Haarcascade, por lo que el skip es esencial para terminar en tiempo razonable.',
             },
             {
-              q: '¿Por qué se reduce la imagen al 50% antes de procesar?',
-              a: 'El resize 0.5x reduce los píxeles a la cuarta parte (½ ancho × ½ alto). Haarcascade es O(n²) en tamaño de imagen. A resoluciones típicas de video (1280×720) procesar cada frame en tamaño original sería muy lento. A 640×360 la detección sigue siendo precisa para distancias de clase.',
+              q: '¿Qué es InsightFace buffalo_l y por qué se eligió sobre LBPH?',
+              a: 'buffalo_l es un modelo preentrenado de InsightFace que combina un detector RetinaFace con ArcFace para reconocimiento. LBPH funcionaba comparando texturas locales (histogramas) y era sensible a variaciones de iluminación y ángulo. ArcFace produce embeddings de 512 dimensiones entrenados con pérdida de margen angular, que son mucho más robustos. La precisión de reconocimiento mejora significativamente con apenas 5 muestras por alumno.',
+            },
+            {
+              q: '¿Qué significa el umbral COSINE_THRESHOLD = 0.35?',
+              a: 'La similitud de coseno entre dos vectores va de -1 (opuesto) a +1 (idéntico). En embeddings ArcFace de la misma persona suele estar entre 0.35 y 0.85; entre personas distintas, por debajo de 0.25. El umbral de 0.35 es empírico y conservador: evita falsos positivos a costa de posibles falsos negativos en condiciones difíciles (iluminación muy baja, perfil extremo).',
             },
             {
               q: '¿Qué pasa si el alumno no tiene muestras faciales registradas?',
-              a: 'En asistencia: no se le crea AttendanceRecord y queda ausente. En fatiga: se usa la cara dominante (más grande) del video sin verificación de identidad, y se notifica en logs.',
+              a: 'En asistencia: se omite al alumno del banco de embeddings y nunca obtendrá un match — queda marcado como ausente. En fatiga: si no hay encodings, el proceso falla con error y lo notifica en logs con loguru.',
             },
             {
               q: '¿Por qué se usa threading en lugar de Celery/queue?',
@@ -667,8 +690,8 @@ else:                 return 'fatigado'   # PERCLOS > 0.30`}
               a: 'PERCLOS varía entre 0 y 1. Un PERCLOS de 0.50 (ojos cerrados la mitad del tiempo) ya es severamente anormal. Multiplicar por 200 hace que ese caso resulte en fatigue=100. Si multiplicáramos por 100, necesitaríamos PERCLOS=1.0 (ojos cerrados todo el tiempo) para llegar a 100, que es un umbral demasiado laxo.',
             },
             {
-              q: '¿Qué significa confidence en LBPH?',
-              a: 'En LBPH el confidence NO es una probabilidad (0-100%). Es una distancia de histograma — cuanto menor, más similar. Un confidence de 0 sería imagen idéntica. El umbral de 100 es empírico: valores menores indican que la cara es suficientemente similar al entrenamiento como para ser el mismo alumno.',
+              q: '¿Por qué la fatiga usa Haarcascade para los ojos si ya tiene InsightFace?',
+              a: 'InsightFace detecta y reconoce personas, pero no estima el estado de apertura de ojos. Para PERCLOS necesitamos saber fotograma a fotograma si los ojos están abiertos o cerrados. Haarcascade eye sobre la región del rostro ya localizada es rápido y suficientemente preciso para esta tarea puntual, sin necesidad de un modelo adicional.',
             },
           ].map(({ q, a }) => (
             <div key={q} className="mt-4 border-b pb-4 last:border-0">

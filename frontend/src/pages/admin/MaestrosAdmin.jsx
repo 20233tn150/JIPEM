@@ -3,7 +3,7 @@ import { Plus, Pencil, Trash2, GraduationCap, CheckCircle, XCircle } from 'lucid
 import api from '../../api/axios'
 import PageHeader from '../../components/PageHeader'
 
-const EMPTY_FORM = { username: '', name: '', email: '', password: '', is_active: true }
+const EMPTY_FORM = { username: '', name: '', password: '', is_active: true }
 
 export default function MaestrosAdmin() {
   const [maestros, setMaestros] = useState([])
@@ -40,7 +40,7 @@ export default function MaestrosAdmin() {
 
   const openEdit = (maestro) => {
     setEditingId(maestro.id)
-    setForm({ username: maestro.username, name: maestro.name || '', email: maestro.email || '', password: '', is_active: maestro.is_active !== false })
+    setForm({ username: maestro.username, name: maestro.name || '', password: '', is_active: maestro.is_active !== false })
     setFormError('')
     setShowModal(true)
   }
@@ -118,7 +118,6 @@ export default function MaestrosAdmin() {
           <tr>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usuario</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Correo</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rol</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
             <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
@@ -132,7 +131,6 @@ export default function MaestrosAdmin() {
             <tr key={m.id} className="hover:bg-gray-50">
               <td className="px-6 py-4 font-mono text-gray-900 text-xs">{m.username}</td>
               <td className="px-6 py-4 font-medium text-gray-900">{m.name || '—'}</td>
-              <td className="px-6 py-4 text-gray-600">{m.email || '—'}</td>
               <td className="px-6 py-4">
                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${roleBadgeClass}`}>
                   {roleLabel}
@@ -241,17 +239,6 @@ export default function MaestrosAdmin() {
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
                   placeholder="Ej. jgarcia"
                   required
-                />
-              </div>
-              <div>
-                <label htmlFor="maestro-email" className="block text-sm font-medium text-gray-700 mb-1.5">Correo</label>
-                <input
-                  id="maestro-email"
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                  placeholder="Ej. jgarcia@correo.com"
                 />
               </div>
               <div>

@@ -6,6 +6,19 @@ import PageHeader from '../../components/PageHeader'
 import SearchableSelect from '../../components/SearchableSelect'
 import DatePicker from '../../components/DatePicker'
 
+/**
+ * Página para crear una nueva sesión de asistencia.
+ *
+ * Flujo en dos pasos:
+ *  1. Seleccionar grupo y fecha → POST /attendance/sessions/ → obtiene el ID de sesión.
+ *  2. Seleccionar video de clase → POST /attendance/sessions/:id/upload-video/ →
+ *     el backend inicia el procesamiento en hilo daemon y responde 202.
+ *     El frontend hace polling cada 3s a /sessions/:id/status/ hasta completar.
+ *
+ * Si la URL incluye ?classroom=<id>, preselecciona el grupo en el formulario.
+ *
+ * Ruta: /attendance/new
+ */
 export default function NewSession() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -28,6 +41,7 @@ export default function NewSession() {
     return () => clearInterval(pollingRef.current)
   }, [])
 
+  /** Crea la sesión de asistencia en el backend con el grupo y la fecha seleccionados. */
   const createSession = async (e) => {
     e.preventDefault()
     setError('')
@@ -45,6 +59,7 @@ export default function NewSession() {
     }
   }
 
+  /** Sube el video al backend como multipart/form-data e inicia el polling de estado. */
   const uploadVideo = async () => {
     if (!videoFile || !session) return
     setError('')
@@ -64,6 +79,11 @@ export default function NewSession() {
     }
   }
 
+  /**
+   * Inicia el polling de estado de la sesión cada 3 segundos.
+   * Navega a la página de detalle al completar, o muestra el error si falla.
+   * @param {number} sessionId - ID de la sesión a monitorear.
+   */
   const startPolling = (sessionId) => {
     pollingRef.current = setInterval(async () => {
       try {

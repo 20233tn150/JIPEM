@@ -18,6 +18,30 @@ class StudentSerializer(serializers.ModelSerializer):
     def get_face_sample_count(self, obj):
         return obj.face_encodings.count()
 
+    def validate_matricula(self, value):
+        """Matricula debe ser única dentro del mismo grupo, no globalmente."""
+        view = self.context.get('view')
+        if view is None:
+            return value
+
+        if self.instance:
+            classroom = self.instance.classroom
+        else:
+            classroom_id = view.kwargs.get('classroom_id')
+            if classroom_id is None:
+                return value
+            try:
+                classroom = Classroom.objects.get(pk=classroom_id)
+            except Classroom.DoesNotExist:
+                return value
+
+        qs = Student.objects.filter(matricula=value, classroom=classroom, is_active=True)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError('Ya existe un alumno con esta matrícula en el grupo.')
+        return value
+
 
 class ClassroomSerializer(serializers.ModelSerializer):
     student_count = serializers.SerializerMethodField()

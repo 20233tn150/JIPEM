@@ -4,6 +4,16 @@ import { Camera, CheckCircle } from 'lucide-react'
 import api from '../../api/axios'
 import PageHeader from '../../components/PageHeader'
 
+/**
+ * Página de captura facial de un alumno.
+ *
+ * Activa la cámara web del dispositivo y permite tomar muestras faciales
+ * que se envían al backend para extraer el embedding ArcFace 512-d.
+ * Se necesitan al menos 5 muestras para habilitar el reconocimiento en
+ * los módulos de asistencia y fatiga.
+ *
+ * Ruta: /classrooms/students/:studentId/capture-face
+ */
 export default function FaceCapture() {
   const { studentId } = useParams()
   const navigate = useNavigate()
@@ -23,6 +33,7 @@ export default function FaceCapture() {
     return () => stopCamera()
   }, [studentId])
 
+  /** Solicita acceso a la cámara y conecta el stream al elemento <video>. */
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true })
@@ -33,12 +44,14 @@ export default function FaceCapture() {
     }
   }
 
+  /** Detiene todos los tracks del stream para liberar la cámara al salir de la página. */
   const stopCamera = () => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(t => t.stop())
     }
   }
 
+  /** Consulta cuántas muestras faciales tiene el alumno ya registradas en el backend. */
   const fetchStatus = async () => {
     try {
       const res = await api.get(`/classrooms/students/${studentId}/face-status/`)
@@ -47,6 +60,10 @@ export default function FaceCapture() {
     } catch {}
   }
 
+  /**
+   * Captura el fotograma actual del video, lo codifica en base64 JPEG
+   * y lo envía al backend. El backend extrae el embedding ArcFace y lo persiste.
+   */
   const capture = useCallback(async () => {
     if (!videoRef.current || !canvasRef.current) return
     setCapturing(true)

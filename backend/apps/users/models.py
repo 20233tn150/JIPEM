@@ -3,6 +3,7 @@ from django.db import models
 
 
 class User(AbstractUser):
+    """Usuario del sistema. Rol admin gestiona todo; rol maestro solo sus propios grupos."""
     ROLE_ADMIN = 'admin'
     ROLE_MAESTRO = 'maestro'
     ROLE_CHOICES = [
