@@ -10,6 +10,8 @@ from .serializers import RegisterSerializer, UserSerializer, AdminMaestroSeriali
 
 
 class RegisterView(generics.CreateAPIView):
+    """Crea un nuevo usuario maestro y devuelve un par de tokens JWT listos para usar."""
+
     queryset = User.objects.all()
     permission_classes = [AllowAny]
     serializer_class = RegisterSerializer
@@ -27,6 +29,8 @@ class RegisterView(generics.CreateAPIView):
 
 
 class LoginView(TokenObtainPairView):
+    """Login con username+password. Extiende la respuesta JWT con los datos del usuario."""
+
     permission_classes = [AllowAny]
 
     def post(self, request, *args, **kwargs):
@@ -50,6 +54,8 @@ class MeView(generics.RetrieveAPIView):
 
 
 class MaestroListCreateView(generics.ListCreateAPIView):
+    """Lista todos los maestros o crea uno nuevo. Solo accesible para administradores."""
+
     permission_classes = [IsAuthenticated, IsAdmin]
     serializer_class = AdminMaestroSerializer
 
@@ -58,6 +64,8 @@ class MaestroListCreateView(generics.ListCreateAPIView):
 
 
 class MaestroDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Obtiene, actualiza o desactiva (soft-delete) un maestro. Solo para administradores."""
+
     permission_classes = [IsAuthenticated, IsAdmin]
     serializer_class = AdminMaestroSerializer
 

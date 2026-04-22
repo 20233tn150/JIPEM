@@ -1,3 +1,17 @@
+/**
+ * Página de detalle de un análisis individual de fatiga.
+ *
+ * Muestra los resultados del análisis PERCLOS: scores de atención y fatiga,
+ * episodios de cierre prolongado de ojos, tiempo total con ojos cerrados y
+ * la clasificación final (atento / distraído / fatigado).
+ *
+ * Permite:
+ *  - Polling automático si el análisis está en estado 'processing'.
+ *  - Descarga del reporte HTML y PDF.
+ *  - Eliminación del análisis.
+ *
+ * Ruta: /fatigue/individual/:id
+ */
 import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { ChevronLeft, BrainCircuit, ExternalLink, User, Calendar, BookOpen, Trash2, RefreshCw, Download } from 'lucide-react'

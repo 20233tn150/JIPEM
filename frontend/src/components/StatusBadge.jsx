@@ -1,3 +1,8 @@
+/**
+ * Muestra el estado de una sesión o análisis como una etiqueta de color.
+ * Soporta: pending, processing, completed, error, atento, fatigado, distraído.
+ * @param {{ status: string }} props
+ */
 const statusConfig = {
   pending: { label: 'Pendiente', class: 'bg-yellow-100 text-yellow-800' },
   processing: { label: 'Procesando', class: 'bg-blue-100 text-blue-800' },

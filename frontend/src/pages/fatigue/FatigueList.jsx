@@ -1,3 +1,8 @@
+/**
+ * Lista paginada de análisis individuales de fatiga.
+ * Permite filtrar por grupo y alumno, y eliminar análisis existentes.
+ * Ruta: /fatigue
+ */
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, BrainCircuit, ArrowRight, User, Calendar, Search, X, Trash2 } from 'lucide-react'
