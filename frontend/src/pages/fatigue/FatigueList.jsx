@@ -76,7 +76,9 @@ export default function FatigueList() {
     <div className="p-6 max-w-6xl mx-auto">
       <PageHeader
         title="Fatiga y Atención"
+        mobileTitle="Fatiga"
         subtitle="Análisis individuales por alumno"
+        mobileSubtitle="Análisis individuales"
         action={
           <Link
             to="/fatigue/new"
