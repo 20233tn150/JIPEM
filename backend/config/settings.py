@@ -8,7 +8,7 @@ SECRET_KEY = config('SECRET')
 
 DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = [host.strip() for host in config('ALLOWED_HOSTS').split(',')]
+ALLOWED_HOSTS = ['*']
 
 
 INSTALLED_APPS = [
@@ -134,7 +134,7 @@ SIMPLE_JWT = {
 }
 
 CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS').split(',')
-CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 
 # Security headers
