@@ -42,5 +42,5 @@ export async function decryptPayload(b64) {
 
 /** Returns true when the URL targets a classroom endpoint. */
 export function isClassroomUrl(url = '') {
-  return /\/classrooms(\/\d+\/?)?(\?.*)?$/.test(url)
+  return /\/classrooms(\/\d+)?\/?(\?.*)?$/.test(url)
 }
