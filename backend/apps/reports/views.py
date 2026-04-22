@@ -58,7 +58,8 @@ class AttendanceReportView(APIView):
             'total_count': records.count(),
         })
         return HttpResponse(html, content_type=_HTML_CONTENT_TYPE)
-    
+
+
 class AttendancePDFView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -95,7 +96,7 @@ class AttendancePDFView(APIView):
             result = _pisa.CreatePDF(html_string.encode('utf-8'), dest=buffer, encoding='utf-8')
 
             if result.err:
-                return HttpResponse(f"Error al generar PDF", status=500, content_type='text/plain')
+                return HttpResponse("Error al generar PDF", status=500, content_type='text/plain')
 
             buffer.seek(0)
             response = HttpResponse(buffer.read(), content_type='application/pdf')
@@ -153,6 +154,7 @@ class IndividualFatigueReportView(APIView):
             'student': analysis.student,
         })
         return HttpResponse(html, content_type=_HTML_CONTENT_TYPE)
+
 
 class IndividualFatiguePDFView(APIView):
     permission_classes = [IsAuthenticated]
