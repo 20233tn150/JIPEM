@@ -7,6 +7,19 @@ import StatusBadge from '../../components/StatusBadge'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { Card, CardContent } from '../../components/ui/card'
 
+/**
+ * Página de detalle de una sesión de asistencia.
+ *
+ * Muestra el estado del procesamiento y, si está completada, la lista de alumnos
+ * con su asistencia. Permite:
+ *  - Polling automático cada 3s si el estado es 'processing'.
+ *  - Corrección manual de asistencia por alumno (toggle).
+ *  - Reintento de subida de video si la sesión está en estado 'error'.
+ *  - Eliminación de la sesión (solo en estado 'pending' o 'error').
+ *  - Descarga del reporte HTML y PDF.
+ *
+ * Ruta: /attendance/:id
+ */
 export default function SessionDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -27,6 +40,7 @@ export default function SessionDetail() {
     return () => clearInterval(pollingRef.current)
   }, [id])
 
+  /** Carga los datos de la sesión y sus registros de asistencia. Activa polling si está procesando. */
   const fetchData = async () => {
     setLoading(true)
     setError('')
@@ -44,6 +58,7 @@ export default function SessionDetail() {
     }
   }
 
+  /** Consulta el estado de la sesión cada 3s y recarga datos al completar o fallar. */
   const startPolling = () => {
     clearInterval(pollingRef.current)
     pollingRef.current = setInterval(async () => {
@@ -59,6 +74,7 @@ export default function SessionDetail() {
     }, 3000)
   }
 
+  /** Descarga el reporte HTML de la sesión desde el backend y lo abre en nueva pestaña. */
   const openReport = async () => {
     try {
       const res = await api.get(`/reports/attendance/?session_id=${id}`, { responseType: 'text' })
@@ -68,6 +84,10 @@ export default function SessionDetail() {
     }
   }
 
+  /**
+   * Alterna la asistencia manual de un registro (presente ↔ ausente).
+   * @param {{ id: number, is_present: boolean }} record - Registro a modificar.
+   */
   const handleToggle = async (record) => {
     setToggling(record.id)
     try {
@@ -81,6 +101,30 @@ export default function SessionDetail() {
     }
   }
 
+  /** Descarga el reporte de asistencia en formato PDF usando un enlace temporal. */
+  const downloadPDF = async () => {
+    setPdfLoading(true)
+    try {
+      const res = await api.get(`/reports/attendance/pdf/`, {
+        params: { session_id: id },
+        responseType: 'blob'
+      });
+
+      const url = globalThis.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Reporte_Asistencia_${session.classroom_name || id}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      globalThis.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Error al descargar PDF:", err);
+      alert("No se pudo generar el archivo PDF.");
+    } finally {
+      setPdfLoading(false)
+    }
+  };
 
   if (loading) {
     return (
@@ -190,6 +234,42 @@ export default function SessionDetail() {
         title={`Sesión del ${session?.date}`}
         mobileTitle={session?.date}
         subtitle={session?.classroom_name || `Grupo ${session?.classroom}`}
+        action={
+          <div className="flex items-center gap-2">
+            {canDelete && (
+              <button
+                onClick={() => setDeleteConfirm(true)}
+                disabled={deleteLoading}
+                className="bg-red-100 hover:bg-red-200 text-red-700 font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm disabled:opacity-50"
+              >
+                <Trash2 size={15} />
+                Eliminar sesión
+              </button>
+            )}
+            {isCompleted && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={openReport}
+                  className="bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm"
+                >
+                  <ExternalLink size={15} /> Ver HTML
+                </button>
+                <button
+                  onClick={downloadPDF}
+                  disabled={pdfLoading}
+                  className="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  {pdfLoading ? (
+                    <RefreshCw size={15} className="animate-spin" />
+                  ) : (
+                    <Download size={15} />
+                  )}
+                  {pdfLoading ? 'Generando...' : 'Descargar PDF'}
+                </button>
+              </div>
+            )}
+          </div>
+        }
       />
 
       {/* Acciones en grid de 3 columnas */}
