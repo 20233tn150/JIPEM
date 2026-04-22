@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ChevronLeft, CheckCircle, XCircle, ClipboardList, ExternalLink, RefreshCw, Upload, Trash2, AlertTriangle, Download } from 'lucide-react'
+import { ChevronLeft, CheckCircle, XCircle, ClipboardList, ExternalLink, RefreshCw, Upload, Trash2, AlertTriangle } from 'lucide-react'
 import api from '../../api/axios'
 import PageHeader from '../../components/PageHeader'
 import StatusBadge from '../../components/StatusBadge'
@@ -21,7 +21,6 @@ export default function SessionDetail() {
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [retryError, setRetryError] = useState('')
   const pollingRef = useRef(null)
-  const [pdfLoading, setPdfLoading] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -82,29 +81,6 @@ export default function SessionDetail() {
     }
   }
 
-  const downloadPDF = async () => {
-    setPdfLoading(true)
-    try {
-      const res = await api.get(`/reports/attendance/pdf/`, {
-        params: { session_id: id },
-        responseType: 'blob'
-      });
-
-      const url = globalThis.URL.createObjectURL(new Blob([res.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `Reporte_Asistencia_${session.classroom_name || id}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      globalThis.URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error("Error al descargar PDF:", err);
-      alert("No se pudo generar el archivo PDF.");
-    } finally {
-      setPdfLoading(false)
-    }
-  };
 
   if (loading) {
     return (
@@ -217,7 +193,7 @@ export default function SessionDetail() {
       />
 
       {/* Acciones en grid de 3 columnas */}
-      <div className="grid grid-cols-3 gap-3 mb-6">
+      <div className="grid grid-cols-2 gap-3 mb-6">
         <button
           onClick={() => setDeleteConfirm(true)}
           disabled={!canDelete || deleteLoading}
@@ -236,16 +212,6 @@ export default function SessionDetail() {
           <ExternalLink size={15} />
           <span className="hidden sm:inline">Ver HTML</span>
           <span className="sm:hidden">HTML</span>
-        </button>
-
-        <button
-          onClick={downloadPDF}
-          disabled={!isCompleted || pdfLoading}
-          className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 font-medium text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          {pdfLoading ? <RefreshCw size={15} className="animate-spin" /> : <Download size={15} />}
-          <span className="hidden sm:inline">{pdfLoading ? 'Generando...' : 'Descargar PDF'}</span>
-          <span className="sm:hidden">PDF</span>
         </button>
       </div>
 

@@ -271,23 +271,17 @@ export default function ClassroomSessions() {
         subtitle="Sesiones de asistencia ordenadas por fecha"
         mobileSubtitle="Sesiones por fecha"
         action={
-          <div className="flex gap-2">
+          <div className="hidden md:flex gap-2">
             {user?.role === 'admin' && (
               <button
                 onClick={downloadExcel}
                 disabled={excelLoading}
                 className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow font-semibold transition-colors flex items-center gap-2 text-sm disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                {excelLoading ? (
-                  <RefreshCw size={15} className="animate-spin" />
-                ) : (
-                  <FileSpreadsheet size={15} />
-                )}
+                {excelLoading ? <RefreshCw size={15} className="animate-spin" /> : <FileSpreadsheet size={15} />}
                 {excelLoading ? 'Generando...' : 'Descargar Reporte Excel'}
               </button>
-
             )}
-
             <button
               onClick={() => setShowNewSession(true)}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow font-semibold transition-colors flex items-center gap-2 text-sm"
@@ -297,6 +291,26 @@ export default function ClassroomSessions() {
           </div>
         }
       />
+
+      {/* Mobile: botones en grid debajo del título */}
+      <div className={`md:hidden grid gap-3 mb-6 ${user?.role === 'admin' ? 'grid-cols-2' : 'grid-cols-1'}`}>
+        {user?.role === 'admin' && (
+          <button
+            onClick={downloadExcel}
+            disabled={excelLoading}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow font-semibold transition-colors flex items-center justify-center gap-2 text-sm disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {excelLoading ? <RefreshCw size={15} className="animate-spin" /> : <FileSpreadsheet size={15} />}
+            {excelLoading ? 'Generando...' : 'Excel'}
+          </button>
+        )}
+        <button
+          onClick={() => setShowNewSession(true)}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow font-semibold transition-colors flex items-center justify-center gap-2 text-sm"
+        >
+          <Plus size={15} /> Nueva Sesión
+        </button>
+      </div>
 
       {error && (
         <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">

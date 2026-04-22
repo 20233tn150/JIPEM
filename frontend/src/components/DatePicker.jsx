@@ -70,6 +70,7 @@ export default function DatePicker({ value, onChange, id, required }) {
           selected={selected}
           onSelect={handleSelect}
           defaultMonth={selected || new Date()}
+          disabled={{ before: new Date() }}
           initialFocus
         />
       </PopoverContent>

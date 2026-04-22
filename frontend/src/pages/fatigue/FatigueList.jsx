@@ -175,7 +175,73 @@ export default function FatigueList() {
       )}
       {listContent === 'table' && (
         <div className="bg-white rounded-xl border overflow-hidden">
-          <div className="overflow-x-auto">
+
+          {/* Mobile cards */}
+          <div className="md:hidden divide-y divide-gray-100">
+            {filtered.map(a => {
+              const labelStyle = LABEL_STYLE[a.result_label] || {}
+              const attPct = Math.round(a.attention_score)
+              let attColor = attPct >= 70 ? 'bg-green-500' : attPct >= 40 ? 'bg-amber-500' : 'bg-red-500'
+              let attTextColor = attPct >= 70 ? 'text-green-600' : attPct >= 40 ? 'text-amber-600' : 'text-red-600'
+              return (
+                <div key={a.id} className="p-4">
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
+                        <User size={14} className="text-purple-600" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-gray-900 truncate">{a.student_name}</p>
+                        <p className="text-xs text-gray-400 font-mono">{a.student_matricula}</p>
+                      </div>
+                    </div>
+                    <StatusBadge status={a.status} />
+                  </div>
+
+                  <div className="flex items-center gap-3 text-xs text-gray-500 mb-3 ml-10">
+                    <span>{a.classroom_name || '—'}</span>
+                    <span>·</span>
+                    <span className="flex items-center gap-1"><Calendar size={11} />{a.date}</span>
+                  </div>
+
+                  {a.status === 'completed' && a.result_label && (
+                    <div className="ml-10 mb-3 flex items-center gap-3">
+                      <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${labelStyle.bg} ${labelStyle.text}`}>
+                        {a.result_label}
+                      </span>
+                      <div className="flex items-center gap-2 flex-1">
+                        <span className={`text-xs font-semibold ${attTextColor}`}>{attPct}%</span>
+                        <div className="flex-1 bg-gray-100 rounded-full h-1.5">
+                          <div className={`h-1.5 rounded-full ${attColor}`} style={{ width: `${attPct}%` }} />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 ml-10">
+                    <Link
+                      to={`/fatigue/individual/${a.id}`}
+                      className="flex-1 flex items-center justify-center gap-1.5 text-purple-600 border border-purple-200 hover:bg-purple-50 text-xs font-medium px-3 py-2 rounded-lg transition-colors"
+                    >
+                      Ver detalle <ArrowRight size={12} />
+                    </Link>
+                    {a.status !== 'processing' && (
+                      <button
+                        onClick={() => setConfirm(a)}
+                        disabled={deletingId === a.id}
+                        className="flex items-center justify-center text-red-500 border border-red-200 hover:bg-red-50 px-3 py-2 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Desktop table */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b">
                 <tr>
@@ -192,15 +258,8 @@ export default function FatigueList() {
                 {filtered.map(a => {
                   const labelStyle = LABEL_STYLE[a.result_label] || {}
                   const attPct = Math.round(a.attention_score)
-                  let attColor
-                  if (attPct >= 70) { attColor = 'bg-green-500' }
-                  else if (attPct >= 40) { attColor = 'bg-amber-500' }
-                  else { attColor = 'bg-red-500' }
-
-                  let attTextColor
-                  if (attPct >= 70) { attTextColor = 'text-green-600' }
-                  else if (attPct >= 40) { attTextColor = 'text-amber-600' }
-                  else { attTextColor = 'text-red-600' }
+                  let attColor = attPct >= 70 ? 'bg-green-500' : attPct >= 40 ? 'bg-amber-500' : 'bg-red-500'
+                  let attTextColor = attPct >= 70 ? 'text-green-600' : attPct >= 40 ? 'text-amber-600' : 'text-red-600'
                   return (
                     <tr key={a.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4">
@@ -221,15 +280,11 @@ export default function FatigueList() {
                           {a.date}
                         </div>
                       </td>
-                      <td className="px-6 py-4">
-                        <StatusBadge status={a.status} />
-                      </td>
+                      <td className="px-6 py-4"><StatusBadge status={a.status} /></td>
                       <td className="px-6 py-4 min-w-28">
                         {a.status === 'completed' && a.result_label ? (
                           <div className="flex items-center gap-2">
-                            <span className={`text-xs font-semibold w-8 text-right ${attTextColor}`}>
-                              {attPct}%
-                            </span>
+                            <span className={`text-xs font-semibold w-8 text-right ${attTextColor}`}>{attPct}%</span>
                             <div className="flex-1 bg-gray-100 rounded-full h-1.5">
                               <div className={`h-1.5 rounded-full ${attColor}`} style={{ width: `${attPct}%` }} />
                             </div>
@@ -256,7 +311,6 @@ export default function FatigueList() {
                               onClick={() => setConfirm(a)}
                               disabled={deletingId === a.id}
                               className="inline-flex items-center gap-1 text-red-500 hover:text-red-700 text-xs font-medium px-2.5 py-1.5 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
-                              title="Eliminar análisis"
                             >
                               <Trash2 size={12} />
                             </button>

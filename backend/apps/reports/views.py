@@ -11,6 +11,13 @@ from apps.attendance.models import AttendanceSession
 from apps.fatigue.models import FatigueSession, IndividualFatigueAnalysis
 
 try:
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+except ImportError:
+    openpyxl = None
+
+try:
     from xhtml2pdf import pisa as _pisa
 except ImportError:
     _pisa = None
