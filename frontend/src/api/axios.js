@@ -13,6 +13,7 @@
  */
 
 import axios from 'axios'
+import { encryptPayload, decryptPayload, isClassroomUrl } from './classroomCrypto'
 
 const BASE_URL = import.meta.env.VITE_API_URL
 
@@ -66,20 +67,33 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
-// Request interceptor: attach access token
+// Request interceptor: attach access token + encrypt classroom payloads
 api.interceptors.request.use(
-  (config) => {
+  async (config) => {
     if (accessToken) {
       config.headers['Authorization'] = `Bearer ${accessToken}`
+    }
+    if (
+      isClassroomUrl(config.url) &&
+      config.data &&
+      typeof config.data === 'object'
+    ) {
+      const encrypted = await encryptPayload(config.data)
+      config.data = JSON.stringify({ data: encrypted })
     }
     return config
   },
   (error) => Promise.reject(error),
 )
 
-// Response interceptor: auto-refresh on 401
+// Response interceptor: decrypt classroom responses + auto-refresh on 401
 api.interceptors.response.use(
-  (response) => response,
+  async (response) => {
+    if (isClassroomUrl(response.config?.url) && response.data?.data) {
+      response.data = await decryptPayload(response.data.data)
+    }
+    return response
+  },
   async (error) => {
     const originalRequest = error.config
     const storedRefresh = getStoredRefresh()
