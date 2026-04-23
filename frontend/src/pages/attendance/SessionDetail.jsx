@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ChevronLeft, CheckCircle, XCircle, ClipboardList, ExternalLink, RefreshCw, Upload, Trash2, AlertTriangle } from 'lucide-react'
+import { ChevronLeft, CheckCircle, XCircle, ClipboardList, ExternalLink, RefreshCw, Upload, Trash2, AlertTriangle, Download } from 'lucide-react'
 import api from '../../api/axios'
 import PageHeader from '../../components/PageHeader'
 import StatusBadge from '../../components/StatusBadge'
@@ -33,6 +33,7 @@ export default function SessionDetail() {
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [retryError, setRetryError] = useState('')
+  const [pdfLoading, setPdfLoading] = useState(false)
   const pollingRef = useRef(null)
 
   useEffect(() => {
@@ -272,28 +273,6 @@ export default function SessionDetail() {
         }
       />
 
-      {/* Acciones en grid de 3 columnas */}
-      <div className="grid grid-cols-2 gap-3 mb-6">
-        <button
-          onClick={() => setDeleteConfirm(true)}
-          disabled={!canDelete || deleteLoading}
-          className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 font-medium text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          <Trash2 size={15} />
-          <span className="hidden sm:inline">Eliminar sesión</span>
-          <span className="sm:hidden">Eliminar</span>
-        </button>
-
-        <button
-          onClick={openReport}
-          disabled={!isCompleted}
-          className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 font-medium text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          <ExternalLink size={15} />
-          <span className="hidden sm:inline">Ver HTML</span>
-          <span className="sm:hidden">HTML</span>
-        </button>
-      </div>
 
       {retryError && !isError && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-6 text-sm flex items-center gap-2">

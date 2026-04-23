@@ -147,3 +147,5 @@ CSRF_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_HTTPONLY = True
 
 LOGGING_CONFIG = None  # loguru se configura en manage.py / wsgi.py
+
+CLASSROOM_ENCRYPTION_KEY = config('CLASSROOM_ENCRYPTION_KEY')

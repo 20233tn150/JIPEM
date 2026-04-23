@@ -50,18 +50,21 @@ pip install -r requirements.txt
 Crea un archivo `.env` en `backend/` con el siguiente contenido:
 
 ```env
-SECRET_KEY=cambia-esta-clave-por-una-aleatoria-larga
+SECRET=cambia-esta-clave-por-una-aleatoria-larga
 DEBUG=True
 
-DB_ENGINE=django.db.backends.mysql
-DB_NAME=presentia_db
-DB_USER=root
-DB_PASSWORD=tu_contraseña_mysql
-DB_HOST=localhost
-DB_PORT=3306
+DATABASE_NAME=jipem_db
+DATABASE_USER=root
+DATABASE_PASSWORD=tu_contraseña_mysql
+DATABASE_HOST=localhost
+DATABASE_PORT=3306
 
 ALLOWED_HOSTS=localhost,127.0.0.1
 CORS_ALLOWED_ORIGINS=http://localhost:5173
+
+# Clave AES-256 compartida con el frontend (64 hex chars = 32 bytes)
+# Generar nueva clave: python -c "import os; print(os.urandom(32).hex())"
+CLASSROOM_ENCRYPTION_KEY=a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2
 ```
 
 ### 5. Crear la base de datos en MySQL
@@ -113,7 +116,18 @@ cd JIPEM/frontend
 npm install
 ```
 
-### 2. Iniciar el servidor de desarrollo
+### 2. Configurar variables de entorno
+
+Crea un archivo `.env` en `frontend/`:
+
+```env
+VITE_API_URL=http://localhost:8000/api
+
+# Debe ser la misma clave que CLASSROOM_ENCRYPTION_KEY del backend
+VITE_CLASSROOM_ENCRYPTION_KEY=a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2
+```
+
+### 3. Iniciar el servidor de desarrollo
 
 ```bash
 npm run dev
@@ -143,6 +157,23 @@ JIPEM/
         ├── context/      # AuthContext
         ├── components/   # Layout, PageHeader, StatusBadge
         └── pages/        # Todas las vistas de la app
+```
+
+---
+
+## Cifrado AES-256-GCM en endpoints de grupos
+
+Los 5 endpoints de `/api/classrooms/` tienen cifrado simétrico a nivel de aplicación:
+
+- **Algoritmo:** AES-256-GCM (IV de 12 bytes aleatorio por mensaje, tag de 16 bytes)
+- **Clave:** 256 bits configurada en `.env` de backend y frontend — deben coincidir
+- **Formato en red:** `{ "data": "<base64(IV || ciphertext || tag)>" }`
+- **Transparente para el usuario:** los interceptores de axios cifran/descifran automáticamente
+
+Para generar una clave nueva en producción:
+
+```bash
+python -c "import os; print(os.urandom(32).hex())"
 ```
 
 ---
