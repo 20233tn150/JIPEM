@@ -41,7 +41,12 @@ _EYE_CASCADE = cv2.CascadeClassifier(
 
 # ── InsightFace singleton (shared with attendance pipeline) ─────────────────
 def _get_face_app():
-    """Re-use the InsightFace app from the attendance module (same process singleton)."""
+    """
+    Reutiliza la aplicación InsightFace del módulo de asistencia.
+
+    Returns:
+        FaceAnalysis: Instancia del singleton del modelo.
+    """
     from apps.attendance.tasks import _get_face_app as _attendance_get_face_app
     return _attendance_get_face_app()
 
@@ -49,8 +54,16 @@ def _get_face_app():
 # ── Student embedding ───────────────────────────────────────────────────────
 def _build_student_embedding(student, log):
     """
-    Load all ArcFace encodings for this student and return a single
-    mean L2-normalized 512-d reference vector. Returns None if no valid encodings.
+    Carga y promedia las codificaciones ArcFace de un estudiante.
+
+    Genera un vector de referencia de 512-d normalizado (L2).
+
+    Args:
+        student (Student): Instancia del modelo Student.
+        log (logger): Logger con contexto vinculado.
+
+    Returns:
+        np.array: Vector promedio de 512 dimensiones o None si no hay encodings.
     """
     encodings = list(student.face_encodings.all())
     if not encodings:
@@ -85,9 +98,15 @@ def _build_student_embedding(student, log):
 # ── Face identification ─────────────────────────────────────────────────────
 def _find_student_face(faces, student_embedding):
     """
-    From the list of InsightFace-detected faces, return the one most likely
-    to be the target student (highest cosine similarity >= COSINE_THRESHOLD).
-    Returns the face object or None.
+    Identifica el rostro del estudiante objetivo entre múltiples detecciones.
+
+    Args:
+        faces (list): Detecciones de InsightFace en el frame actual.
+        student_embedding (np.array): Vector de referencia del estudiante.
+
+    Returns:
+        Face: El objeto de rostro con mayor similitud de coseno, o None si 
+            ninguno supera el COSINE_THRESHOLD.
     """
     best_face = None
     best_score = -1.0
@@ -113,13 +132,20 @@ def _find_student_face(faces, student_embedding):
 # ── Eye analysis ────────────────────────────────────────────────────────────
 def _analyze_eyes(face_bgr, state, eye_closed_frames, fps):
     """
-    Detect open eyes in the upper 60% of the face crop (BGR).
+    Detecta ojos abiertos en la región superior del rostro detectado.
 
-    Updates state dict:
-      eye_detected_frames  — frames where >=1 eye was found
-      no_eye_counter       — consecutive frames without eyes
-      eyes_closed_secs     — accumulated closure seconds
-      closure_episodes     — count of distinct sustained-closure events
+    Utiliza Haarcascade en el 60% superior del recorte del rostro para mejorar 
+    la precisión y reducir falsos positivos.
+
+    Args:
+        face_bgr (np.array): Recorte (crop) del rostro en formato BGR.
+        state (dict): Diccionario de estado acumulativo para la sesión.
+        eye_closed_frames (int): Umbral de frames para considerar un cierre sostenido.
+        fps (float): Cuadros por segundo del video original.
+
+    Note:
+        Actualiza los contadores de frames con ojos detectados, segundos de 
+        cierre acumulados y episodios de micro-sueño.
     """
     gray = cv2.cvtColor(face_bgr, cv2.COLOR_BGR2GRAY)
     gray = cv2.equalizeHist(gray)
@@ -147,6 +173,19 @@ def _analyze_eyes(face_bgr, state, eye_closed_frames, fps):
 
 # ── Score computation ───────────────────────────────────────────────────────
 def _compute_scores(state, log):
+    """
+    Calcula los puntajes finales de fatiga y atención basados en PERCLOS.
+
+    La fatiga se calcula como: min(100, perclos * 200 + episodios_cierre * 5).
+
+    Args:
+        state (dict): Diccionario con las estadísticas acumuladas del video.
+        log (logger): Instancia de loguru.
+
+    Returns:
+        dict: Contiene scores de 'attention', 'fatigue', 'perclos' y estadísticas,
+            o None si no se detectó el rostro en ningún frame.
+    """
     face_frames = state['face_frames']
     if face_frames == 0:
         return None
@@ -172,6 +211,15 @@ def _compute_scores(state, log):
 
 
 def _classify(attention_score: float) -> str:
+    """
+    Clasifica el nivel de atención en etiquetas legibles.
+
+    Args:
+        attention_score (float): Score de 0 a 100.
+
+    Returns:
+        str: 'atento' (>=70), 'distraido' (40-69) o 'fatigado' (<40).
+    """
     if attention_score >= 70:
         return 'atento'
     elif attention_score >= 40:
@@ -181,6 +229,24 @@ def _classify(attention_score: float) -> str:
 
 # ── Main processing function ────────────────────────────────────────────────
 def process_individual_fatigue(analysis_id: int, video_path: str) -> None:
+    """
+    Orquestador principal del análisis de fatiga individual.
+
+    Flujo:
+    1. Actualiza estado a 'PROCESSING'.
+    2. Procesa el video frame a frame identificando al estudiante.
+    3. Analiza la región ocular en cada frame positivo.
+    4. Calcula scores y clasifica el resultado final.
+    5. Limpia archivos temporales y persiste en DB.
+
+    Args:
+        analysis_id (int): ID del registro IndividualFatigueAnalysis.
+        video_path (str): Ruta al video temporal subido.
+
+    Note:
+        Se utiliza el campo 'yawn_count' para almacenar técnicamente los 
+        'episodios de cierre' (micro-sueños), dada la reutilización del modelo.
+    """
     from apps.fatigue.models import IndividualFatigueAnalysis
 
     log = logger.bind(pipeline=True, analysis_id=analysis_id)
@@ -313,6 +379,13 @@ def process_individual_fatigue(analysis_id: int, video_path: str) -> None:
 
 
 def start_individual_fatigue_processing(analysis_id: int, video_path: str) -> None:
+    """
+    Inicia el procesamiento de fatiga en un hilo de ejecución separado (daemon).
+
+    Args:
+        analysis_id (int): ID del análisis para seguimiento.
+        video_path (str): Ruta del archivo de video.
+    """
     thread = threading.Thread(
         target=process_individual_fatigue,
         args=(analysis_id, video_path),
