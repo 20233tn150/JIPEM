@@ -45,7 +45,7 @@ export default function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
             <Route index element={<Navigate to="/dashboard" replace />} />
-            <Route path="dashboard" element={<Dashboard />} />
+            <Route path="admin/dashboard" element={<AdminRoute><Dashboard /></AdminRoute>} />
             <Route path="admin/maestros" element={<AdminRoute><MaestrosAdmin /></AdminRoute>} />
             <Route path="classrooms" element={<ClassroomList />} />
             <Route path="classrooms/:id" element={<ClassroomDetail />} />

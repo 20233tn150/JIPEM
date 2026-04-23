@@ -23,7 +23,6 @@ import {
 import { useAuth } from '../context/AuthContext'
 
 const navLinks = [
-  { to: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
   { to: '/classrooms', label: 'Grupos', Icon: BookOpen },
   { to: '/attendance', label: 'Asistencia', Icon: ClipboardList },
   { to: '/fatigue', label: 'Análisis de Fatiga', Icon: BrainCircuit },
@@ -41,10 +40,9 @@ function NavItem({ to, label, Icon, onClick }) {
       to={to}
       onClick={onClick}
       className={({ isActive }) =>
-        `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-          isActive
-            ? 'bg-blue-600 text-white'
-            : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+        `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive
+          ? 'bg-blue-600 text-white'
+          : 'text-slate-400 hover:bg-slate-800 hover:text-white'
         }`
       }
     >
@@ -61,20 +59,18 @@ function MobileNavItem({ to, label, Icon, onClick }) {
       to={to}
       onClick={onClick}
       className={({ isActive }) =>
-        `group relative flex items-center gap-3 px-2 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
-          isActive
-            ? 'bg-blue-600 text-white'
-            : 'text-slate-400 hover:bg-slate-800 hover:text-white hover:translate-x-0.5'
+        `group relative flex items-center gap-3 px-2 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${isActive
+          ? 'bg-blue-600 text-white'
+          : 'text-slate-400 hover:bg-slate-800 hover:text-white hover:translate-x-0.5'
         }`
       }
     >
       {({ isActive }) => (
         <>
-          <span className={`flex items-center justify-center w-8 h-8 rounded-lg shrink-0 transition-all duration-200 ${
-            isActive
+          <span className={`flex items-center justify-center w-8 h-8 rounded-lg shrink-0 transition-all duration-200 ${isActive
               ? 'bg-blue-500 text-white'
               : 'bg-slate-800 text-slate-400 group-hover:bg-slate-700 group-hover:text-white'
-          }`}>
+            }`}>
             <Icon size={16} />
           </span>
           <span className="flex-1 leading-none">{label}</span>
@@ -122,6 +118,7 @@ function DesktopSidebarContent({ user, onLogout }) {
           <div className="mt-5 pt-4 border-t border-slate-700/60">
             <p className="text-slate-500 text-xs uppercase tracking-wider px-3 mb-2">Administración</p>
             <NavItem to="/admin/maestros" label="Maestros" Icon={GraduationCap} />
+            <NavItem to="/admin/dashboard" label="Dashboard" Icon={LayoutDashboard} />
           </div>
         )}
       </nav>
@@ -253,9 +250,8 @@ export default function Layout() {
         />
       )}
       <aside
-        className={`md:hidden fixed inset-0 z-50 bg-slate-900 text-white flex flex-col transform transition-transform duration-300 ease-in-out ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        className={`md:hidden fixed inset-0 z-50 bg-slate-900 text-white flex flex-col transform transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
       >
         <MobileSidebarContent
           user={user}
