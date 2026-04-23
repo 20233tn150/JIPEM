@@ -18,14 +18,22 @@ MAX_UPLOAD_SIZE = getattr(settings, 'MAX_UPLOAD_SIZE', 500 * 1024 * 1024)
 
 class IndividualFatigueListView(generics.ListAPIView):
     """
-    GET  individual/  — lista los análisis del maestro autenticado.
-    POST individual/  — recibe student_id, date y video (multipart), crea el
-                        análisis y lanza el procesamiento en un hilo daemon.
+    Vista para listar y solicitar análisis de fatiga individuales.
+
+    Permite consultar el histórico de análisis filtrado por alumno o grupo,
+    y centraliza la recepción de videos para nuevos procesamientos.
     """
     serializer_class = IndividualFatigueAnalysisSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        """
+        Obtiene los análisis filtrados por permisos y parámetros de consulta.
+
+        Returns:
+            QuerySet: Análisis del maestro (o todos si es admin) filtrados opcionalmente 
+                por 'student_id' o 'classroom_id'.
+        """
         qs = IndividualFatigueAnalysis.objects.select_related(
             'student__classroom', 'maestro'
         )
@@ -40,6 +48,19 @@ class IndividualFatigueListView(generics.ListAPIView):
         return qs.order_by('-date', '-created_at')
 
     def post(self, request, *args, **kwargs):
+        """
+        Crea un nuevo análisis de fatiga e inicia el procesamiento asíncrono.
+
+        Valida que el alumno pertenezca al maestro, que el formato de video sea 
+        soportado y que el tamaño no exceda el límite configurado.
+
+        Args:
+            request (Request): Objeto con 'student_id', 'date' y 'video' (FILE).
+
+        Returns:
+            Response: 202 (Accepted) con los datos iniciales del análisis.
+            Response: 400 (Bad Request) si faltan datos o el video no es válido.
+        """
         student_id = request.data.get('student_id')
         date = request.data.get('date')
         video_file = request.FILES.get('video')
@@ -87,7 +108,9 @@ class IndividualFatigueListView(generics.ListAPIView):
 
 
 class IndividualFatigueDetailView(generics.RetrieveAPIView):
-    """Detalle de un análisis individual por id."""
+    """
+    Consulta el detalle completo de un análisis de fatiga específico.
+    """
     serializer_class = IndividualFatigueAnalysisSerializer
     permission_classes = [IsAuthenticated]
 
@@ -99,10 +122,24 @@ class IndividualFatigueDetailView(generics.RetrieveAPIView):
 
 
 class IndividualFatigueStatusView(APIView):
-    """Endpoint de polling — devuelve solo el estado actual del análisis."""
+    """
+    Endpoint para monitoreo de estado (Polling).
+    """
     permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
+        """
+        Retorna exclusivamente el estado del proceso y mensajes de error.
+
+        Útil para que el frontend actualice barras de progreso o notificaciones 
+        sin cargar toda la relación de datos del análisis.
+
+        Args:
+            pk (int): Clave primaria del análisis.
+
+        Returns:
+            Response: JSON con 'id', 'status' y 'error_message'.
+        """
         qs = IndividualFatigueAnalysis.objects.all()
         if not request.user.is_admin:
             qs = qs.filter(maestro=request.user)
@@ -115,10 +152,25 @@ class IndividualFatigueStatusView(APIView):
 
 
 class IndividualFatigueDeleteView(APIView):
-    """Elimina un análisis individual (cualquier estado excepto procesando)."""
+    """
+    Gestiona la eliminación de registros de análisis.
+    """
     permission_classes = [IsAuthenticated]
 
     def delete(self, request, pk):
+        """
+        Elimina un registro de análisis si no está siendo procesado actualmente.
+
+        Args:
+            pk (int): Clave primaria del análisis a eliminar.
+
+        Returns:
+            Response: 204 si la eliminación fue exitosa.
+            Response: 400 si el estado es 'PROCESSING'.
+
+        Raises:
+            Http404: Si el análisis no existe o no pertenece al usuario.
+        """
         qs = IndividualFatigueAnalysis.objects.all()
         if not request.user.is_admin:
             qs = qs.filter(maestro=request.user)
