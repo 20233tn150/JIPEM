@@ -1,14 +1,21 @@
+/**
+ * Lista de sesiones de asistencia del maestro autenticado.
+ * Permite filtrar por grupo y navegar al detalle de cada sesión.
+ * Ruta: /attendance
+ */
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, ClipboardList, ArrowRight, Users, Calendar, Search, X } from 'lucide-react'
 import api from '../../api/axios'
 import PageHeader from '../../components/PageHeader'
+import NewSessionModal from '../../components/NewSessionModal'
 
 export default function SessionList() {
   const [sessions, setSessions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
+  const [showNewSession, setShowNewSession] = useState(false)
 
   useEffect(() => {
     api.get('/attendance/sessions/')
@@ -93,12 +100,12 @@ export default function SessionList() {
       <ClipboardList size={40} className="mx-auto mb-4 text-gray-300" />
       <p className="text-lg font-medium text-gray-600 mb-1">Sin sesiones registradas</p>
       <p className="text-sm text-gray-400 mb-6">Crea tu primera sesión de asistencia</p>
-      <Link
-        to="/attendance/new"
+      <button
+        onClick={() => setShowNewSession(true)}
         className="inline-flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
       >
         <Plus size={14} /> Nueva Sesión
-      </Link>
+      </button>
     </div>
   ) : groupsGridContent
 
@@ -120,12 +127,12 @@ export default function SessionList() {
         title="Asistencia"
         subtitle="Sesiones por grupo"
         action={
-          <Link
-            to="/attendance/new"
+          <button
+            onClick={() => setShowNewSession(true)}
             className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm"
           >
             <Plus size={15} /> Nueva Sesión
-          </Link>
+          </button>
         }
       />
 
@@ -157,6 +164,11 @@ export default function SessionList() {
       )}
 
       {sessionsContent}
+
+      <NewSessionModal
+        open={showNewSession}
+        onClose={() => setShowNewSession(false)}
+      />
     </div>
   )
 }

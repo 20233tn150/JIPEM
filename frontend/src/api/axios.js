@@ -1,3 +1,17 @@
+/**
+ * Cliente HTTP de Presentia — axios preconfigurado con autenticación JWT automática.
+ *
+ * Estrategia de tokens:
+ *  - access token  → solo en memoria RAM (no localStorage) para proteger contra XSS.
+ *  - refresh token → en sessionStorage para sobrevivir recargas de página.
+ *
+ * Interceptores:
+ *  - Request:  adjunta el access token como Bearer header en cada petición.
+ *  - Response: si llega un 401, intenta refrescar el token automáticamente.
+ *              Las peticiones que llegan mientras se refresca se encolan y se
+ *              reintentan una vez que el nuevo access token esté disponible.
+ */
+
 import axios from 'axios'
 import { encryptPayload, decryptPayload, isClassroomUrl } from './classroomCrypto'
 
@@ -9,24 +23,37 @@ let accessToken = null
 let isRefreshing = false
 let failedQueue = []
 
+/**
+ * Guarda el par de tokens tras un login o refresh exitoso.
+ * @param {string} access  - Nuevo access token JWT (15 min de vida).
+ * @param {string|null} refresh - Refresh token (1 día); null para no actualizar sessionStorage.
+ */
 export function setTokens(access, refresh) {
   accessToken = access
   if (refresh) sessionStorage.setItem('rt', refresh)
 }
 
+/** Elimina ambos tokens de memoria y sessionStorage. Llama en logout o 401 irrecuperable. */
 export function clearTokens() {
   accessToken = null
   sessionStorage.removeItem('rt')
 }
 
+/** Devuelve el access token en memoria, o null si no hay sesión activa. */
 export function getAccessToken() {
   return accessToken
 }
 
+/** Devuelve el refresh token de sessionStorage, o null si no existe. */
 export function getStoredRefresh() {
   return sessionStorage.getItem('rt')
 }
 
+/**
+ * Resuelve o rechaza todas las peticiones encoladas durante un refresh en curso.
+ * @param {Error|null} error - Error del refresh; null si fue exitoso.
+ * @param {string|null} token - Nuevo access token si el refresh fue exitoso.
+ */
 const processQueue = (error, token = null) => {
   failedQueue.forEach(({ resolve, reject }) => {
     if (error) reject(error)
@@ -40,32 +67,33 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
-// Request interceptor: encrypt classroom payloads
+// Request interceptor: attach access token + encrypt classroom payloads
 api.interceptors.request.use(
   async (config) => {
-    if (isClassroomUrl(config.url) && config.data && !config._encrypted) {
-      config.data = await encryptPayload(config.data)
-      config._encrypted = true
-    }
-    return config
-  },
-  (error) => Promise.reject(error),
-)
-
-// Request interceptor: attach access token
-api.interceptors.request.use(
-  (config) => {
     if (accessToken) {
       config.headers['Authorization'] = `Bearer ${accessToken}`
     }
+    if (
+      isClassroomUrl(config.url) &&
+      config.data &&
+      typeof config.data === 'object'
+    ) {
+      const encrypted = await encryptPayload(config.data)
+      config.data = JSON.stringify({ data: encrypted })
+    }
     return config
   },
   (error) => Promise.reject(error),
 )
 
-// Response interceptor: auto-refresh on 401
+// Response interceptor: decrypt classroom responses + auto-refresh on 401
 api.interceptors.response.use(
-  (response) => response,
+  async (response) => {
+    if (isClassroomUrl(response.config?.url) && response.data?.data) {
+      response.data = await decryptPayload(response.data.data)
+    }
+    return response
+  },
   async (error) => {
     const originalRequest = error.config
     const storedRefresh = getStoredRefresh()
@@ -110,17 +138,6 @@ api.interceptors.response.use(
 
     throw error
   },
-)
-
-// Response interceptor: decrypt classroom responses
-api.interceptors.response.use(
-  async (response) => {
-    if (isClassroomUrl(response.config.url) && response.data?.data) {
-      response.data = await decryptPayload(response.data)
-    }
-    return response
-  },
-  (error) => Promise.reject(error),
 )
 
 export default api

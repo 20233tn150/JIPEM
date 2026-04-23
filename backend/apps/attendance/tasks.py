@@ -1,17 +1,3 @@
-"""
-Attendance processing — InsightFace (ArcFace) pipeline.
-
-Pipeline:
-  1. Load stored 512-d ArcFace embeddings from DB and compute mean per student.
-  2. Read video frame by frame (every FRAMES_TO_SKIP frames).
-  3. Run InsightFace FaceAnalysis on each frame:
-       - SCRFD face detector (handles small/distant faces better than Haarcascade)
-       - ArcFace embedding (512-d, L2-normalized, robust to lighting/distance)
-  4. For each detected face, compute cosine similarity against all student embeddings.
-  5. Assign face to the student with the highest similarity above COSINE_THRESHOLD.
-  6. Mark student present if detected in >= PRESENCE_THRESHOLD_PCT of processed frames.
-"""
-
 import io
 import os
 import threading
@@ -23,7 +9,6 @@ from loguru import logger
 PRESENCE_THRESHOLD_PCT = 0.10
 # Process 1 of every N frames. At 30fps a 32s video -> 96 processed frames.
 FRAMES_TO_SKIP = 10
-
 # ArcFace cosine similarity threshold.
 # buffalo_l ArcFace: same person typically > 0.35, different person typically < 0.25.
 COSINE_THRESHOLD = 0.35
@@ -33,7 +18,20 @@ _face_app_lock = threading.Lock()
 
 
 def _get_face_app():
-    """Lazy-initialize InsightFace FaceAnalysis (thread-safe singleton)."""
+    """
+    Inicializa de forma perezosa (Lazy-initialize) la aplicación FaceAnalysis.
+
+    Utiliza un bloqueo de hilo (Lock) para garantizar que el modelo de 
+    InsightFace se cargue solo una vez en memoria, incluso en entornos 
+    multi-hilo (Thread-safe singleton).
+
+    Returns:
+        insightface.app.FaceAnalysis: Instancia configurada del modelo Buffalo_L.
+
+    Raises:
+        ImportError: Si las dependencias de InsightFace no están instaladas.
+        Exception: Si falla la carga del modelo en el proveedor especificado (CPU).
+    """
     global _face_app
     if _face_app is None:
         with _face_app_lock:
@@ -56,9 +54,17 @@ def _get_face_app():
 
 def _build_recognizer(students):
     """
-    Load ArcFace embeddings from DB and compute one mean embedding per student.
+    Carga los embeddings de ArcFace desde la DB y calcula el promedio por estudiante.
 
-    Returns: {student_id: mean_normalized_embedding (512-d float32)}  or  {}
+    Este método normaliza los vectores individuales, calcula el centroide (mean)
+    y vuelve a normalizar para asegurar que la similitud de coseno sea válida.
+
+    Args:
+        students (list[Student]): Lista de objetos Student con encodings pre-cargados.
+
+    Returns:
+        dict: Un diccionario mapping {student_id: mean_embedding} donde el 
+            embedding es un numpy.array de forma (512,).
     """
     student_embeddings = {}
 
@@ -99,10 +105,20 @@ def _build_recognizer(students):
 
 def _recognize_faces_in_frame(faces, session_id, student_embeddings, frame_count_map):
     """
-    Match each InsightFace-detected face against student embeddings.
+    Compara los rostros detectados en un frame contra la base de datos de estudiantes.
 
-    Each face in the frame is assigned to at most one student (seen_in_frame
-    prevents double-counting). Low-confidence detections are skipped.
+    Calcula la similitud de coseno entre cada detección y los promedios de los 
+    estudiantes. Aplica un umbral de confianza y evita el conteo doble del mismo 
+    estudiante en un solo frame.
+
+    Args:
+        faces (list): Lista de objetos de detección de InsightFace.
+        session_id (int): ID de la sesión actual para logging.
+        student_embeddings (dict): Diccionario de embeddings {id: vector_512d}.
+        frame_count_map (dict): Mapa acumulativo de frames detectados por estudiante.
+
+    Note:
+        Se ignora cualquier detección con un 'det_score' inferior a 0.5.
     """
     seen_in_frame = set()
     log = logger.bind(pipeline=True, session_id=session_id)
@@ -141,6 +157,20 @@ def _recognize_faces_in_frame(faces, session_id, student_embeddings, frame_count
 
 
 def process_attendance_video(session_id: int, video_path: str) -> None:
+    """
+    Orquestador principal del pipeline de asistencia mediante video.
+
+    Realiza el ciclo de vida completo: marca la sesión como procesando, 
+    extrae frames, detecta rostros, calcula asistencia y limpia el archivo temporal.
+
+    Args:
+        session_id (int): ID de la instancia AttendanceSession en la base de datos.
+        video_path (str): Ruta local absoluta al archivo de video .mp4 o .avi.
+
+    Raises:
+        ValueError: Si el archivo de video no se puede abrir o está corrupto.
+        AttendanceSession.DoesNotExist: Si el session_id no es válido.
+    """
     from apps.attendance.models import AttendanceSession
     from apps.classrooms.models import Student
 
@@ -217,6 +247,18 @@ def process_attendance_video(session_id: int, video_path: str) -> None:
 
 
 def _finalize_session(session, students, presence_map, log):
+    """
+    Calcula el estado final de asistencia y persiste los resultados en la DB.
+
+    Determina si un estudiante está presente basándose en PRESENCE_THRESHOLD_PCT 
+    y utiliza 'bulk_create' para insertar todos los registros en una sola transacción.
+
+    Args:
+        session (AttendanceSession): Instancia del modelo de la sesión.
+        students (list[Student]): Lista de estudiantes inscritos en el aula.
+        presence_map (dict): Mapeo de {student_id: porcentaje_presencia_float}.
+        log (logger): Instancia de loguru vinculada al contexto actual.
+    """
     from apps.attendance.models import AttendanceRecord
 
     records = []
@@ -241,6 +283,16 @@ def _finalize_session(session, students, presence_map, log):
 
 
 def start_attendance_processing(session_id: int, video_path: str) -> None:
+    """
+    Punto de entrada asíncrono para iniciar el procesamiento de video.
+
+    Lanza un hilo demonio (daemon thread) para ejecutar 'process_attendance_video' 
+    sin bloquear la respuesta principal de Django (ideal para vistas de API).
+
+    Args:
+        session_id (int): ID de la sesión de asistencia.
+        video_path (str): Ruta al archivo de video subido.
+    """
     thread = threading.Thread(
         target=process_attendance_video,
         args=(session_id, video_path),

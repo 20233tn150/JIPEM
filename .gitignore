@@ -23,6 +23,7 @@ dist/
 # Vite
 frontend/dist/
 frontend/.cache/
+frontend/.vite/
 
 # OS
 .DS_Store

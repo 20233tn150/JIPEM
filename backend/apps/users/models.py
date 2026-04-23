@@ -3,12 +3,17 @@ from django.db import models
 
 
 class User(AbstractUser):
+    """Usuario del sistema. Rol admin gestiona todo; rol maestro solo sus propios grupos."""
     ROLE_ADMIN = 'admin'
     ROLE_MAESTRO = 'maestro'
     ROLE_CHOICES = [
         (ROLE_ADMIN, 'Administrador'),
         (ROLE_MAESTRO, 'Maestro'),
     ]
+
+    first_name = None  # removed from DB; use `name` instead
+    last_name = None
+    email = None
 
     name = models.CharField(max_length=200, blank=True)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default=ROLE_MAESTRO)

@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext'
 import PageHeader from '../../components/PageHeader'
 import StatusBadge from '../../components/StatusBadge'
 import ConfirmDialog from '../../components/ConfirmDialog'
+import NewSessionModal from '../../components/NewSessionModal'
 
 export default function ClassroomSessions() {
   const { classroomId } = useParams()
@@ -20,6 +21,7 @@ export default function ClassroomSessions() {
   const [deletingId, setDeletingId] = useState(null)
   const [confirm, setConfirm] = useState(null)
   const [excelLoading, setExcelLoading] = useState(false)
+  const [showNewSession, setShowNewSession] = useState(false)
 
 
   useEffect(() => {
@@ -125,71 +127,114 @@ export default function ClassroomSessions() {
       <p className="text-sm">Sin resultados para "<strong>{search}</strong>"</p>
     </div>
   ) : (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead className="bg-gray-50 border-b">
-          <tr>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Asistencia</th>
-            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100">
-          {visible.map(session => (
-            <tr key={session.id} className="hover:bg-gray-50">
-              <td className="px-6 py-4 font-medium text-gray-900">{session.date}</td>
-              <td className="px-6 py-4">
-                <StatusBadge status={session.status} />
-              </td>
-              <td className="px-6 py-4 text-gray-600">
-                {session.status === 'completed' && session.present_count !== undefined ? (
-                  <span className="font-medium">
-                    {session.present_count}
-                    <span className="text-gray-400 font-normal"> / {session.total_students} presentes</span>
-                  </span>
-                ) : '—'}
-              </td>
-              <td className="px-6 py-4">
-                <div className="flex items-center justify-end gap-1">
-                  <Link
-                    to={`/attendance/${session.id}`}
-                    className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-xs font-medium px-2.5 py-1.5 rounded hover:bg-blue-50 transition-colors"
-                  >
-                    Ver <ArrowRight size={12} />
-                  </Link>
-                  {session.status === 'pending' && (
-                    <label className="inline-flex items-center gap-1 cursor-pointer text-green-600 hover:text-green-800 text-xs font-medium px-2.5 py-1.5 rounded hover:bg-green-50 transition-colors border border-green-200">
-                      <Upload size={12} />
-                      {uploadingId === session.id ? 'Subiendo...' : 'Video'}
-                      <input
-                        type="file"
-                        accept=".mp4,.avi,.mov,.mkv"
-                        className="hidden"
-                        disabled={uploadingId === session.id}
-                        onChange={e => {
-                          if (e.target.files[0]) handleVideoUpload(session.id, e.target.files[0])
-                        }}
-                      />
-                    </label>
-                  )}
-                  {session.status !== 'processing' && (
-                    <button
-                      onClick={() => confirmDelete(session)}
-                      disabled={deletingId === session.id}
-                      className="inline-flex items-center gap-1 text-red-500 hover:text-red-700 text-xs font-medium px-2.5 py-1.5 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
-                      title="Eliminar sesión"
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  )}
-                </div>
-              </td>
+    <>
+      {/* Mobile cards */}
+      <div className="md:hidden divide-y divide-gray-100">
+        {visible.map(session => (
+          <div key={session.id} className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <p className="font-semibold text-gray-900">{session.date}</p>
+              <StatusBadge status={session.status} />
+            </div>
+            {session.status === 'completed' && session.present_count !== undefined && (
+              <p className="text-sm text-gray-500 mb-3">
+                <span className="font-medium text-gray-800">{session.present_count}</span>
+                {' / '}{session.total_students} presentes
+              </p>
+            )}
+            <div className="flex gap-2 mt-3">
+              <Link
+                to={`/attendance/${session.id}`}
+                className="flex-1 flex items-center justify-center gap-1.5 text-blue-600 border border-blue-200 hover:bg-blue-50 text-xs font-medium px-3 py-2 rounded-lg transition-colors"
+              >
+                Ver detalle <ArrowRight size={12} />
+              </Link>
+              {session.status === 'pending' && (
+                <label className="flex-1 flex items-center justify-center gap-1.5 cursor-pointer text-green-600 border border-green-200 hover:bg-green-50 text-xs font-medium px-3 py-2 rounded-lg transition-colors">
+                  <Upload size={12} />
+                  {uploadingId === session.id ? 'Subiendo...' : 'Subir video'}
+                  <input
+                    type="file"
+                    accept=".mp4,.avi,.mov,.mkv"
+                    className="hidden"
+                    disabled={uploadingId === session.id}
+                    onChange={e => { if (e.target.files[0]) handleVideoUpload(session.id, e.target.files[0]) }}
+                  />
+                </label>
+              )}
+              {session.status !== 'processing' && (
+                <button
+                  onClick={() => confirmDelete(session)}
+                  disabled={deletingId === session.id}
+                  className="flex items-center justify-center gap-1.5 text-red-500 border border-red-200 hover:bg-red-50 text-xs font-medium px-3 py-2 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <Trash2 size={13} />
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden md:block overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 border-b">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Asistencia</th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {visible.map(session => (
+              <tr key={session.id} className="hover:bg-gray-50">
+                <td className="px-6 py-4 font-medium text-gray-900">{session.date}</td>
+                <td className="px-6 py-4"><StatusBadge status={session.status} /></td>
+                <td className="px-6 py-4 text-gray-600">
+                  {session.status === 'completed' && session.present_count !== undefined ? (
+                    <span className="font-medium">
+                      {session.present_count}
+                      <span className="text-gray-400 font-normal"> / {session.total_students} presentes</span>
+                    </span>
+                  ) : '—'}
+                </td>
+                <td className="px-6 py-4">
+                  <div className="flex items-center justify-end gap-1">
+                    <Link to={`/attendance/${session.id}`} className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-xs font-medium px-2.5 py-1.5 rounded hover:bg-blue-50 transition-colors">
+                      Ver <ArrowRight size={12} />
+                    </Link>
+                    {session.status === 'pending' && (
+                      <label className="inline-flex items-center gap-1 cursor-pointer text-green-600 hover:text-green-800 text-xs font-medium px-2.5 py-1.5 rounded hover:bg-green-50 transition-colors border border-green-200">
+                        <Upload size={12} />
+                        {uploadingId === session.id ? 'Subiendo...' : 'Video'}
+                        <input
+                          type="file"
+                          accept=".mp4,.avi,.mov,.mkv"
+                          className="hidden"
+                          disabled={uploadingId === session.id}
+                          onChange={e => { if (e.target.files[0]) handleVideoUpload(session.id, e.target.files[0]) }}
+                        />
+                      </label>
+                    )}
+                    {session.status !== 'processing' && (
+                      <button
+                        onClick={() => confirmDelete(session)}
+                        disabled={deletingId === session.id}
+                        className="inline-flex items-center gap-1 text-red-500 hover:text-red-700 text-xs font-medium px-2.5 py-1.5 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   )
 
   const emptySessionsContent = sessions.length === 0 ? (
@@ -197,12 +242,12 @@ export default function ClassroomSessions() {
       <ClipboardList size={40} className="mx-auto mb-4 text-gray-300" />
       <p className="text-lg font-medium text-gray-600 mb-1">Sin sesiones para este grupo</p>
       <p className="text-sm text-gray-400 mb-6">Crea una nueva sesión de asistencia</p>
-      <Link
-        to={`/attendance/new?classroom=${classroomId}`}
+      <button
+        onClick={() => setShowNewSession(true)}
         className="inline-flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
       >
         <Plus size={14} /> Nueva Sesión
-      </Link>
+      </button>
     </div>
   ) : noResultsContent
 
@@ -224,33 +269,48 @@ export default function ClassroomSessions() {
       <PageHeader
         title={classroomName || `Grupo ${classroomId}`}
         subtitle="Sesiones de asistencia ordenadas por fecha"
+        mobileSubtitle="Sesiones por fecha"
         action={
-          <div className="flex gap-2">
+          <div className="hidden md:flex gap-2">
             {user?.role === 'admin' && (
               <button
                 onClick={downloadExcel}
                 disabled={excelLoading}
                 className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow font-semibold transition-colors flex items-center gap-2 text-sm disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                {excelLoading ? (
-                  <RefreshCw size={15} className="animate-spin" />
-                ) : (
-                  <FileSpreadsheet size={15} />
-                )}
+                {excelLoading ? <RefreshCw size={15} className="animate-spin" /> : <FileSpreadsheet size={15} />}
                 {excelLoading ? 'Generando...' : 'Descargar Reporte Excel'}
               </button>
-
             )}
-
-            <Link
-              to={`/attendance/new?classroom=${classroomId}`}
+            <button
+              onClick={() => setShowNewSession(true)}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow font-semibold transition-colors flex items-center gap-2 text-sm"
             >
               <Plus size={15} /> Nueva Sesión
-            </Link>
+            </button>
           </div>
         }
       />
+
+      {/* Mobile: botones en grid debajo del título */}
+      <div className={`md:hidden grid gap-3 mb-6 ${user?.role === 'admin' ? 'grid-cols-2' : 'grid-cols-1'}`}>
+        {user?.role === 'admin' && (
+          <button
+            onClick={downloadExcel}
+            disabled={excelLoading}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow font-semibold transition-colors flex items-center justify-center gap-2 text-sm disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {excelLoading ? <RefreshCw size={15} className="animate-spin" /> : <FileSpreadsheet size={15} />}
+            {excelLoading ? 'Generando...' : 'Excel'}
+          </button>
+        )}
+        <button
+          onClick={() => setShowNewSession(true)}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow font-semibold transition-colors flex items-center justify-center gap-2 text-sm"
+        >
+          <Plus size={15} /> Nueva Sesión
+        </button>
+      </div>
 
       {error && (
         <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
@@ -287,6 +347,12 @@ export default function ClassroomSessions() {
       <div className="bg-white rounded-xl border overflow-hidden">
         {sessionsContent}
       </div>
+
+      <NewSessionModal
+        open={showNewSession}
+        onClose={() => { setShowNewSession(false); fetchSessions() }}
+        preselectedClassroom={classroomId}
+      />
 
       <ConfirmDialog
         open={!!confirm}

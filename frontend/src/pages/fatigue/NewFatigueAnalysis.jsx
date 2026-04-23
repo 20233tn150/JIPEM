@@ -1,10 +1,25 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { ChevronLeft, Loader2, Play, Activity, Eye, Smile, User, Users } from 'lucide-react'
+import { ChevronLeft, Loader2, Play, Activity, Eye, User, Users } from 'lucide-react'
 import api from '../../api/axios'
 import PageHeader from '../../components/PageHeader'
 import SearchableSelect from '../../components/SearchableSelect'
+import DatePicker from '../../components/DatePicker'
 
+/**
+ * Página para crear un nuevo análisis individual de fatiga.
+ *
+ * Flujo:
+ *  1. Seleccionar grupo → carga alumnos del grupo vía GET /classrooms/:id/students/.
+ *  2. Seleccionar alumno, fecha y video → POST /fatigue/individual/ (multipart/form-data).
+ *  3. El backend responde 202, el frontend hace polling cada 3s a /fatigue/individual/:id/status/.
+ *  4. Al completar, navega al detalle del análisis; al fallar, muestra el error del backend.
+ *
+ * El backend identifica al alumno usando embeddings ArcFace y calcula PERCLOS
+ * (Percentage of Eye Closure) con el detector Haarcascade de ojos.
+ *
+ * Ruta: /fatigue/new
+ */
 export default function NewFatigueAnalysis() {
   const navigate = useNavigate()
   const [classrooms, setClassrooms] = useState([])
@@ -24,6 +39,10 @@ export default function NewFatigueAnalysis() {
     return () => clearInterval(pollingRef.current)
   }, [])
 
+  /**
+   * Cambia el grupo seleccionado y recarga los alumnos correspondientes.
+   * @param {string} id - ID del grupo seleccionado.
+   */
   const handleClassroomChange = (id) => {
     setSelectedClassroom(id)
     setSelectedStudent('')
@@ -35,6 +54,7 @@ export default function NewFatigueAnalysis() {
       .finally(() => setLoadingStudents(false))
   }
 
+  /** Envía el video y datos del alumno al backend para iniciar el análisis de fatiga. */
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!selectedStudent || !date || !videoFile) return
@@ -60,6 +80,10 @@ export default function NewFatigueAnalysis() {
     }
   }
 
+  /**
+   * Consulta el estado del análisis cada 3s hasta que termine o falle.
+   * @param {number} analysisId - ID del análisis a monitorear.
+   */
   const startPolling = (analysisId) => {
     pollingRef.current = setInterval(async () => {
       try {
@@ -129,7 +153,7 @@ export default function NewFatigueAnalysis() {
         </Link>
       </div>
 
-      <PageHeader title="Nuevo Análisis Individual" subtitle="Selecciona un alumno y sube su video" />
+      <PageHeader title="Nuevo Análisis Individual" subtitle="Selecciona un alumno y sube su video" mobileSubtitle="Nuevo análisis" />
 
       <div className="bg-white rounded-xl border p-6">
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -174,12 +198,10 @@ export default function NewFatigueAnalysis() {
           {/* Fecha */}
           <div>
             <label htmlFor="analysis-date" className="block text-sm font-medium text-gray-700 mb-1.5">Fecha</label>
-            <input
+            <DatePicker
               id="analysis-date"
-              type="date"
               value={date}
-              onChange={e => setDate(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none text-sm"
+              onChange={setDate}
               required
             />
           </div>
@@ -201,9 +223,9 @@ export default function NewFatigueAnalysis() {
           <div className="bg-slate-50 rounded-lg p-4 text-sm border">
             <p className="font-medium text-slate-700 mb-2">Qué analiza este módulo</p>
             <ul className="space-y-1 text-slate-600">
-              <li className="flex items-center gap-2"><Activity size={13} className="text-purple-500" /> Confirma la identidad del alumno (LBPH)</li>
-              <li className="flex items-center gap-2"><Eye size={13} className="text-indigo-500" /> Detecta cierre de ojos y microsueños</li>
-              <li className="flex items-center gap-2"><Smile size={13} className="text-amber-500" /> Detecta bostezos y apertura bucal</li>
+              <li className="flex items-center gap-2"><Activity size={13} className="text-purple-500" /> Identifica al alumno con ArcFace (InsightFace)</li>
+              <li className="flex items-center gap-2"><Eye size={13} className="text-indigo-500" /> Mide PERCLOS: % del tiempo con ojos cerrados</li>
+              <li className="flex items-center gap-2"><Activity size={13} className="text-amber-500" /> Cuenta episodios de cierre prolongado de ojos</li>
             </ul>
           </div>
 

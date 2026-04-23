@@ -100,7 +100,7 @@ export default function Dashboard() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
-      <PageHeader title="Panel de Análisis" subtitle="Resumen de rendimiento y estado de alumnos" />
+      <PageHeader title="Panel de Análisis" subtitle="Resumen de rendimiento y estado de alumnos" mobileSubtitle="Resumen general" />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <StatCard title="Asistencia" value={`${kpis.attendance_avg}%`} icon={<Users />} color="blue" />

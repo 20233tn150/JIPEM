@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 
 // Pages
+import Dashboard from './pages/dashboard/Dashboard'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import MaestrosAdmin from './pages/admin/MaestrosAdmin'
@@ -43,7 +44,8 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
-            <Route index element={<Navigate to="/classrooms" replace />} />
+            <Route index element={<Navigate to="/dashboard" replace />} />
+            <Route path="admin/dashboard" element={<AdminRoute><Dashboard /></AdminRoute>} />
             <Route path="admin/maestros" element={<AdminRoute><MaestrosAdmin /></AdminRoute>} />
             <Route path="classrooms" element={<ClassroomList />} />
             <Route path="classrooms/:id" element={<ClassroomDetail />} />

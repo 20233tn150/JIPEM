@@ -2,6 +2,13 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import api from '../../api/axios'
 import PageHeader from '../../components/PageHeader'
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '../../components/ui/select'
 
 const EMPTY_FORM = {
   name: '',
@@ -203,17 +210,19 @@ export default function StudentForm() {
               />
             </div>
             <div>
-              <label htmlFor="student-sex" className="block text-sm font-medium text-gray-700 mb-1">Sexo</label>
-              <select
-                id="student-sex"
-                value={form.sex}
-                onChange={(e) => setForm(f => ({ ...f, sex: e.target.value }))}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              <label className="block text-sm font-medium text-gray-700 mb-1">Sexo</label>
+              <Select
+                value={form.sex || ''}
+                onValueChange={(val) => setForm(f => ({ ...f, sex: val }))}
               >
-                <option value="">Seleccionar...</option>
-                <option value="M">Masculino</option>
-                <option value="F">Femenino</option>
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="M">Masculino</SelectItem>
+                  <SelectItem value="F">Femenino</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

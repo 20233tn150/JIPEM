@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Reporte de Asistencia — JIPEM</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 2cm 2cm 2.5cm 2cm;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: Helvetica, Arial, sans-serif;
+      font-size: 12px;
+      color: #111827;
+    }
+
+    /* ── Header ── */
+    .header {
+      text-align: center;
+      border-bottom: 2px solid #2563eb;
+      padding-bottom: 14px;
+      margin-bottom: 18px;
+    }
+    .header-badge {
+      display: inline-block;
+      background: #2563eb;
+      color: #fff;
+      font-size: 10px;
+      font-weight: bold;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 4px 14px;
+      border-radius: 4px;
+      margin-bottom: 8px;
+    }
+    .header-university {
+      font-size: 10px;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 2px;
+    }
+    .header-system {
+      font-size: 9px;
+      color: #9ca3af;
+      margin-bottom: 8px;
+    }
+    .header-title {
+      font-size: 22px;
+      font-weight: bold;
+      color: #111827;
+      letter-spacing: -0.5px;
+    }
+
+    /* ── Meta table ── */
+    .meta-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 16px;
+    }
+    .meta-table td {
+      width: 33.33%;
+      padding: 8px 10px;
+      border: 1px solid #e5e7eb;
+      vertical-align: top;
+    }
+    .meta-label {
+      font-size: 8px;
+      font-weight: bold;
+      color: #9ca3af;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 3px;
+    }
+    .meta-value {
+      font-size: 12px;
+      font-weight: bold;
+      color: #111827;
+    }
+
+    /* ── Summary ── */
+    .summary-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 16px;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+    }
+    .summary-table td {
+      width: 25%;
+      text-align: center;
+      padding: 12px 8px;
+      border-right: 1px solid #f3f4f6;
+      vertical-align: middle;
+    }
+    .summary-table td:last-child { border-right: none; }
+    .summary-number {
+      font-size: 28px;
+      font-weight: bold;
+      line-height: 1;
+      display: block;
+    }
+    .num-total   { color: #374151; }
+    .num-present { color: #16a34a; }
+    .num-absent  { color: #dc2626; }
+    .num-pct     { color: #2563eb; }
+    .summary-label {
+      font-size: 9px;
+      color: #9ca3af;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 4px;
+      display: block;
+    }
+
+    /* ── Attendance table ── */
+    .section-title {
+      font-size: 11px;
+      font-weight: bold;
+      color: #374151;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .attendance-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .attendance-table thead tr {
+      background: #f3f4f6;
+    }
+    .attendance-table thead th {
+      padding: 8px 10px;
+      text-align: left;
+      font-size: 9px;
+      font-weight: bold;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .attendance-table tbody tr {
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .attendance-table tbody tr:last-child { border-bottom: none; }
+    .attendance-table tbody td {
+      padding: 9px 10px;
+      vertical-align: middle;
+      color: #374151;
+      font-size: 11px;
+    }
+    td.num {
+      color: #9ca3af;
+      font-size: 10px;
+      font-weight: bold;
+      width: 36px;
+    }
+    td.name { font-weight: bold; color: #111827; }
+    td.mono { font-family: "Courier New", monospace; font-size: 10px; color: #6b7280; }
+    td.minutes { color: #6b7280; }
+
+    /* ── Status badges ── */
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 99px;
+      font-size: 10px;
+      font-weight: bold;
+    }
+    .badge-present { background: #dcfce7; color: #16a34a; }
+    .badge-absent  { background: #fee2e2; color: #dc2626; }
+
+    /* ── Empty ── */
+    .empty {
+      text-align: center;
+      color: #9ca3af;
+      font-size: 11px;
+      padding: 24px;
+    }
+
+    /* ── Generated note ── */
+    .generated {
+      margin-top: 18px;
+      font-size: 9px;
+      color: #d1d5db;
+      text-align: right;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-badge">JIPEM</div>
+    <div class="header-system">Sistema de Gestión de Asistencia y Fatiga</div>
+    <div class="header-title">Reporte de Asistencia</div>
+  </div>
+
+  <!-- Meta -->
+  <table class="meta-table">
+    <tr>
+      <td>
+        <div class="meta-label">Grupo</div>
+        <div class="meta-value">{{ session.classroom.name }}</div>
+      </td>
+      <td>
+        <div class="meta-label">Materia</div>
+        <div class="meta-value">{{ session.classroom.subject }}</div>
+      </td>
+      <td>
+        <div class="meta-label">Fecha</div>
+        <div class="meta-value">{{ session.date }}</div>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <div class="meta-label">Maestro</div>
+        <div class="meta-value">{{ session.maestro.name|default:session.maestro.username }}</div>
+      </td>
+      <td>
+        <div class="meta-label">Estado</div>
+        <div class="meta-value">{{ session.get_status_display }}</div>
+      </td>
+      <td>
+        <div class="meta-label">Generado</div>
+        <div class="meta-value">{% now "d/m/Y H:i" %}</div>
+      </td>
+    </tr>
+  </table>
+
+  <!-- Summary -->
+  <table class="summary-table">
+    <tr>
+      <td>
+        <span class="summary-number num-total">{{ total_count }}</span>
+        <span class="summary-label">Alumnos</span>
+      </td>
+      <td>
+        <span class="summary-number num-present">{{ present_count }}</span>
+        <span class="summary-label">Presentes</span>
+      </td>
+      <td>
+        <span class="summary-number num-absent">{{ absent_count }}</span>
+        <span class="summary-label">Ausentes</span>
+      </td>
+      <td>
+        <span class="summary-number num-pct">
+          {% if total_count %}{% widthratio present_count total_count 100 %}%{% else %}0%{% endif %}
+        </span>
+        <span class="summary-label">Asistencia</span>
+      </td>
+    </tr>
+  </table>
+
+  <!-- Attendance table -->
+  <div class="section-title">Registro de Alumnos</div>
+  <table class="attendance-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Alumno</th>
+        <th>Matrícula</th>
+        <th>Min. Presentes</th>
+        <th>Estado</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for record in records %}
+      <tr>
+        <td class="num">{{ forloop.counter }}</td>
+        <td class="name">{{ record.student.name }}</td>
+        <td class="mono">{{ record.student.matricula }}</td>
+        <td class="minutes">{{ record.minutes_present }} min</td>
+        <td>
+          {% if record.is_present %}
+            <span class="badge badge-present">Presente</span>
+          {% else %}
+            <span class="badge badge-absent">Ausente</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="5" class="empty">Sin registros de asistencia para esta sesión.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="generated">Reporte generado automáticamente — {% now "d/m/Y H:i" %}</div>
+
+</body>
+</html>
